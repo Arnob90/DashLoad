@@ -16,10 +16,13 @@ export default function App() {
 							<img className="white-svg" src="../assets/plusicon.svg" />
 						</div>
 					</AddDownloadDialogButton>
-
+					<Button className="w-15 h-15">
+						<img className="white-svg" src="../assets/trash-bin-svgrepo-com.svg" />
+					</Button>
 				</div>
 				<DownloadList>
-					<DownloadItem filename="Hollow Knight Silksong" filesize={80} progress={20}></DownloadItem>
+					<DownloadItem filename="Hollow Knight Silksong" filesize={80} progress={20} completed_size={10}></DownloadItem>
+					<DownloadItem filename="Hollow Knight Silksong" filesize={80} progress={20} completed_size={10}></DownloadItem>
 				</DownloadList>
 			</div>
 		</div>

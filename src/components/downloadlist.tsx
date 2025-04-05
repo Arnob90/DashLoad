@@ -5,17 +5,20 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator";
 import { Grid } from "@radix-ui/themes"
 import "../styles/white-image.scss"
+import Result from "postcss/lib/result";
 export interface DownloadInfo {
 	filename: string;
 	progress: number;
 	filesize: number;
+	completed_size: number;
 }
-export function DownloadItem({ filename, progress, filesize }: DownloadInfo) {
+export function DownloadItem({ filename, completed_size, filesize }: DownloadInfo) {
 	return (
-		<div className="flex justify-stretch w-full">
+		<>
 			<label className="text-lg mx-3">{filename}</label>
-			<label className="text-lg">{filesize}MB</label>
-		</div>
+			<label className="text-lg">{completed_size} MB</label>
+			<label className="text-lg">{filesize} MB</label>
+		</>
 	)
 }
 interface DownloadListProps {
@@ -27,26 +30,59 @@ interface DownloadListContainerProps {
 }
 function DownloadListContainer({ children, className }: DownloadListContainerProps) {
 	return (
-		<ul className={`my-2 border-2 border-gray-500 min-h-96 ${className ?? ''}`}>
+		<div className={`my-2 border-2 border-gray-500 min-h-96 ${className ?? ''}`}>
 			{children}
-		</ul>
+		</div>
+	)
+}
+interface BackgroundGridProps {
+
+	children: ReactNode;
+}
+export function BackgroundGrid({ children }: BackgroundGridProps) {
+	const childrenList = React.Children.toArray(children);
+	if (childrenList.length == 0) {
+		return <div className="bg-gray-900">
+		</div>;
+	}
+	const firstElem = childrenList[0]
+	const rest = childrenList.slice(1)
+	return (
+		<>
+			<div className="bg-black border-b-gray-500 outline-2 outline-gray-500">
+				{firstElem}
+			</div>
+			{rest.map((child) => {
+				return (
+					<div className="bg-black border-l-2 border-b-gray-500 outline-2 outline-gray-500">
+						<div className="mx-1">
+							{child}
+						</div>
+					</div>
+				)
+			})}
+		</>
 	)
 }
 export function DownloadList({ children }: DownloadListProps) {
-	const [focusedIndex, setFocusedIndex] = useState(-1);
-	const childrenList: ReactNode[] = React.Children.toArray(children);
+	const [focused, setFocus] = useState(-1)
+	const childrenArr = React.Children.toArray(children)
 	return (
-		<DownloadListContainer className="mx-5">
-			{
-
-				childrenList.map((node, i) => {
-					return (
-						<li tabIndex={0} onFocus={() => setFocusedIndex(i)} onBlur={() => { setFocusedIndex(-1) }} className={`flex flex-row ${focusedIndex != i ? "outline-bottom" : ""} focus:outline outline-gray-500 focus:outline-primary justify-between`}>
-							{node}
-						</li>
-					)
-				})
-			}
-		</DownloadListContainer >
+		<DownloadListContainer>
+			<div className="grid grid-cols-3 max-w-full">
+				<BackgroundGrid>
+					<label>Filename</label>
+					<label>Completed Size</label>
+					<label>Filesize</label>
+				</BackgroundGrid>
+			</div>
+			{childrenArr.map((elem, i) => {
+				return (
+					<div tabIndex={0} onFocus={() => { setFocus(i) }} onBlur={() => { setFocus(-1) }} className={`grid grid-cols-3 justify-stretch focus:outline-2 focus:outline-primary ${focused != i ? "outline-bottom" : ""}`}>
+						{elem}
+					</div>
+				)
+			})}
+		</DownloadListContainer>
 	)
 }
