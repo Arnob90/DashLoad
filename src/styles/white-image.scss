@@ -1,0 +1,9 @@
+.white-svg {
+  filter: invert(99%) sepia(54%) saturate(0%) hue-rotate(162deg) brightness(107%) contrast(100%);
+}
+
+.outline-bottom {
+  border-bottom: 2px solid;
+  margin-bottom: -1px;
+  border-color: var(--color-gray-500);
+}
