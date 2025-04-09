@@ -138,6 +138,7 @@
 	/* Deep dark gray */
 	--color-primary-foreground: #ffffff;
 	/* White text */
+	--color-background-lighter: var(--color-gray-700)
 }
 
 body {

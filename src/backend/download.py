@@ -1,14 +1,16 @@
-from typing import Iterable
 import pypdl
-import dataclasses
+from pypdl import utils
 import uuid
 from pydantic import BaseModel
+import pathlib
 
 
 class DownloadInfo(BaseModel):
     download_id: str | None
     filesize: int | None
     downloaded_file_portion: int | None
+    filename: str | None
+    filepath: str
 
 
 class Downloader:
@@ -19,18 +21,30 @@ class Downloader:
 
     def __init__(self) -> None:
         self.download_tasks: dict[str, pypdl.Pypdl] = {}
+        self.id_to_filepaths: dict[str, str] = {}
 
-    def download(self, download_url: str, filepath: str):
+    async def download(self, download_url: str, filepath: pathlib.Path):
         downloader = pypdl.Pypdl()
-        downloader.start(download_url, block=False)
+        downloader.start(download_url, block=False, file_path=str(filepath))
         id = uuid.uuid4().hex
-        self.download_tasks.update({uuid.uuid4().hex: downloader})
+        filepath_str: str = await utils.get_filepath(
+            download_url, self.headers, str(filepath)
+        )
+        self.download_tasks.update({id: downloader})
+        self.id_to_filepaths.update({id: filepath_str})
         return id
 
-    def query_downloads_info(self) -> Iterable[DownloadInfo]:
+    async def query_downloads_info(self):
+        final_result: list[DownloadInfo] = []
         for id, task in self.download_tasks.items():
-            yield DownloadInfo(
+            filepath = self.id_to_filepaths[id]
+            filename = pathlib.Path(filepath).name
+            required_info = DownloadInfo(
+                filename=filename,
                 download_id=id,
                 filesize=task.size,
                 downloaded_file_portion=task.current_size,
+                filepath=filepath,
             )
+            final_result.append(required_info)
+        return final_result

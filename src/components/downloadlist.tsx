@@ -6,18 +6,19 @@ import { Separator } from "@/components/ui/separator";
 import { Grid } from "@radix-ui/themes"
 import "../styles/white-image.scss"
 import Result from "postcss/lib/result";
-export interface DownloadInfo {
+export interface DownloadItemProps {
 	filename: string;
 	progress: number;
-	filesize: number;
-	completed_size: number;
+	filesize: number | null;
+	completedSize: number;
 }
-export function DownloadItem({ filename, completed_size, filesize }: DownloadInfo) {
+export function DownloadItem({ filename, completedSize, filesize }: DownloadItemProps) {
+	console.log(completedSize)
 	return (
 		<>
 			<label className="text-lg mx-3">{filename}</label>
-			<label className="text-lg">{completed_size} MB</label>
-			<label className="text-lg">{filesize} MB</label>
+			<label className="text-lg">{completedSize} MIB</label>
+			<label className="text-lg">{filesize ?? "Unknown"} MB</label>
 		</>
 	)
 }
