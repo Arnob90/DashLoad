@@ -19,6 +19,6 @@ export class DownloadInfoActions {
 		return (givenInfo.downloaded_file_portion / givenInfo.filesize) * 100
 	}
 	static getSizeInMIB(givenSize: number) {
-		return givenSize / (2 ** 20)
+		return parseFloat((givenSize / (2 ** 20)).toFixed(1))
 	}
 }

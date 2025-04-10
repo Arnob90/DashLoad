@@ -5,11 +5,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 interface AddDownloadDialogButtonProps {
-	children: ReactNode
-	className?: string
 	submitEvent?: (url: string, folderPath: string) => void;
+	dialogOpen: boolean;
+	dialogOpenStatusChangeRequest?: (statusRequested: boolean) => void;
 }
-export function AddDownloadDialogButton({ children, className, submitEvent: folderChoosenEvent }: AddDownloadDialogButtonProps) {
+export function AddDownloadDialogButton({ submitEvent, dialogOpen, dialogOpenStatusChangeRequest }: AddDownloadDialogButtonProps) {
 	const [selectedFolder, setSelectedFolder] = useState("")
 	const [selectedUrl, setSelectedUrl] = useState("")
 	async function handleOpenFileDialog() {
@@ -26,8 +26,7 @@ export function AddDownloadDialogButton({ children, className, submitEvent: fold
 			setSelectedFolder(selectedPath)
 		})
 	}
-	return (<Dialog>
-		<DialogTrigger className={className ?? ""}>{children}</DialogTrigger>
+	return (<Dialog open={dialogOpen} onOpenChange={dialogOpenStatusChangeRequest}>
 		<DialogContent>
 			<DialogHeader>
 				<DialogTitle>Add Download</DialogTitle>
@@ -50,9 +49,7 @@ export function AddDownloadDialogButton({ children, className, submitEvent: fold
 			</div>
 			<DialogFooter>
 				<Button type="submit" className="w-full" onClick={() => {
-					if (folderChoosenEvent) {
-						folderChoosenEvent(selectedUrl, selectedFolder);
-					}
+					submitEvent(selectedUrl, selectedFolder);
 				}}>Add Download</Button>
 			</DialogFooter>
 		</DialogContent>

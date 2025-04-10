@@ -1,8 +1,18 @@
+from aiohttp.helpers import strip_auth_from_url
 import pypdl
 from pypdl import utils
 import uuid
 from pydantic import BaseModel
 import pathlib
+
+
+def get_inverse_map[K, V](given_map: dict[K, V]) -> dict[V, K]:
+    required_map: dict[V, K] = {}
+    for key, val in given_map.items():
+        if required_map.get(val) is None:
+            raise ValueError("The given map is not bijective")
+        required_map.update({val: key})
+    return required_map
 
 
 class DownloadInfo(BaseModel):
@@ -34,17 +44,23 @@ class Downloader:
         self.id_to_filepaths.update({id: filepath_str})
         return id
 
+    def create_download_info_from_download_obj(self, id: str):
+        download_obj = self.download_tasks[id]
+        required_info = DownloadInfo(
+            filename=str(pathlib.Path(self.id_to_filepaths[id]).name),
+            download_id=id,
+            filesize=download_obj.size,
+            downloaded_file_portion=download_obj.current_size,
+            filepath=self.id_to_filepaths[id],
+        )
+        return required_info
+
     async def query_downloads_info(self):
         final_result: list[DownloadInfo] = []
-        for id, task in self.download_tasks.items():
-            filepath = self.id_to_filepaths[id]
-            filename = pathlib.Path(filepath).name
-            required_info = DownloadInfo(
-                filename=filename,
-                download_id=id,
-                filesize=task.size,
-                downloaded_file_portion=task.current_size,
-                filepath=filepath,
-            )
+        for id in self.download_tasks:
+            required_info = self.create_download_info_from_download_obj(id)
             final_result.append(required_info)
         return final_result
+
+    async def get_download_info_from_id(self, id: str):
+        return self.create_download_info_from_download_obj(id)

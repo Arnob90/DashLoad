@@ -32,3 +32,9 @@ async def get_request():
 async def post_request(request: DownloadRequest):
     id = await download_manager.download(request.url, pathlib.Path(request.filepath))
     return {"id": id}
+
+
+@app.get("/download/{id}", response_model=download.DownloadInfo)
+async def get_by_id(id: str):
+    required_task = await download_manager.get_download_info_from_id(id)
+    return required_task
