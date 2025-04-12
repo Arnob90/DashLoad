@@ -1,18 +1,9 @@
-from aiohttp.helpers import strip_auth_from_url
 import pypdl
 from pypdl import utils
 import uuid
 from pydantic import BaseModel
 import pathlib
-
-
-def get_inverse_map[K, V](given_map: dict[K, V]) -> dict[V, K]:
-    required_map: dict[V, K] = {}
-    for key, val in given_map.items():
-        if required_map.get(val) is None:
-            raise ValueError("The given map is not bijective")
-        required_map.update({val: key})
-    return required_map
+from dataclasses import dataclass
 
 
 class DownloadInfo(BaseModel):
@@ -23,15 +14,21 @@ class DownloadInfo(BaseModel):
     filepath: str
 
 
+@dataclass(frozen=True)
+class ExtraInfos:
+    download_id: str
+    url: str
+    filepath: str
+
+
 class Downloader:
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0",
-        "range": "bytes=-10485760",
     }
 
     def __init__(self) -> None:
         self.download_tasks: dict[str, pypdl.Pypdl] = {}
-        self.id_to_filepaths: dict[str, str] = {}
+        self.id_to_info: dict[str, ExtraInfos] = {}
 
     async def download(self, download_url: str, filepath: pathlib.Path):
         downloader = pypdl.Pypdl()
@@ -41,17 +38,23 @@ class Downloader:
             download_url, self.headers, str(filepath)
         )
         self.download_tasks.update({id: downloader})
-        self.id_to_filepaths.update({id: filepath_str})
+        required_info = ExtraInfos(
+            download_id=id, url=download_url, filepath=filepath_str
+        )
+        self.id_to_info.update({id: required_info})
         return id
 
     def create_download_info_from_download_obj(self, id: str):
+        if id not in self.download_tasks:
+            raise ValueError("The given id is not being downloaded")
         download_obj = self.download_tasks[id]
+        required_filepath = self.id_to_info[id].filepath
         required_info = DownloadInfo(
-            filename=str(pathlib.Path(self.id_to_filepaths[id]).name),
+            filename=str(pathlib.Path(required_filepath).name),
             download_id=id,
             filesize=download_obj.size,
             downloaded_file_portion=download_obj.current_size,
-            filepath=self.id_to_filepaths[id],
+            filepath=required_filepath,
         )
         return required_info
 
@@ -64,3 +67,33 @@ class Downloader:
 
     async def get_download_info_from_id(self, id: str):
         return self.create_download_info_from_download_obj(id)
+
+    async def pause_download(self, id: str):
+        if id not in self.download_tasks:
+            raise ValueError("The given id is not being downloaded")
+        required_download: pypdl.Pypdl = self.download_tasks[id]
+        required_download.stop()
+
+    async def delete_download_task(self, id: str, delete_file_on_disk=False):
+        if id not in self.download_tasks:
+            return None
+        self.download_tasks[id].stop()
+        self.download_tasks.pop(id)
+        filepath_to_delete = self.id_to_info[id].filepath
+        self.id_to_info.pop(id)
+        if delete_file_on_disk:
+            to_delete_file = pathlib.Path(filepath_to_delete)
+            to_delete_file.unlink()
+
+    async def resume_download(self, id: str):
+        if id not in self.download_tasks:
+            raise ValueError("The given id is not being downloaded")
+        download_url = self.id_to_info[id].url
+        # We take the full filepath, so even if the filename changes on server
+        # It doesn't affect the resuming
+        filepath_to_download_to = pathlib.Path(self.id_to_info[id].filepath)
+        downloader = pypdl.Pypdl()
+        downloader.start(
+            download_url, block=False, file_path=str(filepath_to_download_to)
+        )
+        self.download_tasks[id] = downloader

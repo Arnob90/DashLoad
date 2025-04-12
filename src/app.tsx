@@ -48,7 +48,7 @@ function useMockDownloadInfos() {
 }
 export default function App() {
 	const [downloadIds, setDownloadIds] = useState<string[]>([])
-	const downloadInfos = useDownloadInfos()
+	const downloadInfos = useMockDownloadInfos()
 	const [dialogOpen, setDialogOpen] = useState(false)
 	async function startDownload(url: string, filepath: string) {
 		const request: DownloadRequest = { filepath: filepath, url: url }
