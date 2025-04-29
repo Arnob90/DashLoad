@@ -130,6 +130,8 @@
 	/* Dark gray */
 	--color-accent: #22c55e;
 	/* Green */
+	--color-success: var(--color-accent);
+	/* Green */
 	--color-warning: #fbbf24;
 	/* Yellow */
 	--color-danger: #dc2626;

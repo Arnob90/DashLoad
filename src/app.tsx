@@ -1,34 +1,29 @@
-import React, { use, useEffect, useRef, useState } from "react";
-import { Button, buttonVariants } from "../components/ui/button";
-import { Progress } from "@/components/ui/progress"
+import React, { useRef, useEffect, useState } from "react";
+import { Button } from "../components/ui/button";
 import "./styles/globals.css"
 import "./styles/white-image.scss"
 import { DownloadTable } from "./components/downloadlist";
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { DownloadInfo, DefaultRequestOpts, DownloadInfoActions } from "./code/DownloadFromServer";
+import { DownloadInfo, DefaultRequestOpts, downloadsListSchema, DownloadingInfo, DownloadsList } from "./code/DownloadFromServer";
 import { AddDownloadDialogButton } from "./components/AddDownloadDialog";
-export interface DownloadRequest {
-	url: string
-	filepath: string
-}
-export interface DownloadRequestResponse {
-	id: string
-}
-function useDownloadInfos() {
-	const [downloadInfos, setDownloadInfos] = useState<DownloadInfo[]>([])
+import { DownloadDeleteDialog } from "./components/DownloadDeleteDialog"
+import { StartDownload, CancelDownload, PauseDownload, ResumeOrPause, ResumeDownload, RetryDownload } from "./code/FrontendDownloadFunctions";
+function useDownloadInfos(): DownloadInfo[] {
+	const [downloadInfos, setDownloadInfos] = useState<DownloadsList>([])
 	const [continueExec, setContinueExec] = useState(true)
+	let requestBody: any;
 	async function updateDownloadInfos() {
 		try {
 			const request = await fetch("http://localhost:8000/download", {
 				method: "GET",
 				headers: DefaultRequestOpts.headers
 			})
-			const requestBody = await request.json()
-			const requestItem = requestBody as DownloadInfo[]
+			requestBody = await request.json()
+			const requestItem = downloadsListSchema.parse(requestBody)
 			setDownloadInfos(requestItem)
 		}
 		catch (err) {
 			console.error(err)
+			console.log(requestBody)
 		}
 		if (continueExec) {
 			setTimeout(() => updateDownloadInfos(), 500)
@@ -43,43 +38,40 @@ function useDownloadInfos() {
 	return downloadInfos;
 }
 function useMockDownloadInfos() {
-	const requiredMocks: DownloadInfo[] = [{ filename: "Test", filesize: 5000000000, downloaded_file_portion: 20000000, download_id: "ofajoifjaoji298ur3u", filepath: "~/DownloadsTest/" }]
+	const requiredMocks: DownloadInfo[] = [{ download_id: "afjojfoajfoi", filepath: "/home/arnob/DownloadsTest/1.3GBiconpng", downloaded_file_portion: 39040499, filesize: 3901938090, filename: "Sus", type: "DownloadingInfo", download_speed: 1 } as DownloadingInfo]
 	return requiredMocks
 }
+
 export default function App() {
-	const [downloadIds, setDownloadIds] = useState<string[]>([])
-	const downloadInfos = useMockDownloadInfos()
+	const downloadInfos = useDownloadInfos()
 	const [dialogOpen, setDialogOpen] = useState(false)
-	async function startDownload(url: string, filepath: string) {
-		const request: DownloadRequest = { filepath: filepath, url: url }
-		const res = await fetch("http://localhost:8000/download", {
-			method: "POST",
-			body: JSON.stringify(request),
-			headers: DefaultRequestOpts.headers
-		})
-		const resBody = (await res.json()) as DownloadRequestResponse
-		downloadIds.push(resBody.id)
-		setDownloadIds(downloadIds);
+	const focusedDownloadInfo = useRef<DownloadInfo | null>(null)
+	async function startDownloadHelper(url: string, filepath: string) {
 		setDialogOpen(false)
+		await StartDownload(url, filepath)
 	}
 	return (
 
 		<div className="grid grid-cols-1">
 
 			<AddDownloadDialogButton submitEvent={(url: string, folderPath: string) => {
-				startDownload(url, folderPath)
+				startDownloadHelper(url, folderPath)
 			}} dialogOpen={dialogOpen} dialogOpenStatusChangeRequest={setDialogOpen} />
 			<div className="flex flex-col">
 				<div className="flex w-full py-2 border-2 border-b-gray-600 sticky">
 					<Button className="w-15 h-15 mx-2 bg-primary p-4" onClick={() => { setDialogOpen(true) }}>
 						<img className="white-svg" src="../assets/plusicon.svg" />
 					</Button>
-					<Button className="w-15 h-15 bg-danger">
-						<img className="white-svg" src="../assets/trash-bin-svgrepo-com.svg" />
-					</Button>
+					<DownloadDeleteDialog deleteConfirmationCallback={(deleteLocalFile: boolean) => {
+					}}>
+						<Button className="w-15 h-15 bg-destructive">
+							<img className="white-svg" src="../assets/trash-bin-svgrepo-com.svg" />
+						</Button>
+					</DownloadDeleteDialog>
 				</div>
-				<DownloadTable downloadInfos={downloadInfos}></DownloadTable>
+				<DownloadTable downloadInfos={downloadInfos} pausedOrPlayButtonPressedEventHandler={ResumeOrPause} retryButtonPressedEventHandler={RetryDownload} focusChangedEventHandler={(info) => { focusedDownloadInfo.current = info }}></DownloadTable>
 			</div>
 		</div>
+
 	)
 }
