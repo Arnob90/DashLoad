@@ -43,9 +43,9 @@ function useMockDownloadInfos() {
 }
 
 export default function App() {
-	const downloadInfos = useDownloadInfos()
+	const downloadInfos = useMockDownloadInfos()
 	const [dialogOpen, setDialogOpen] = useState(false)
-	const focusedDownloadInfo = useRef<DownloadInfo | null>(null)
+	const [focusedDownloadInfo, setFocusedDownloadInfo] = useState<DownloadInfo | null>(null)
 	async function startDownloadHelper(url: string, filepath: string) {
 		setDialogOpen(false)
 		await StartDownload(url, filepath)
@@ -64,12 +64,12 @@ export default function App() {
 					</Button>
 					<DownloadDeleteDialog deleteConfirmationCallback={(deleteLocalFile: boolean) => {
 					}}>
-						<Button className="w-15 h-15 bg-destructive">
+						<Button className="w-15 h-15 bg-destructive" onMouseDown={(e) => { e.preventDefault() }}>
 							<img className="white-svg" src="../assets/trash-bin-svgrepo-com.svg" />
 						</Button>
 					</DownloadDeleteDialog>
 				</div>
-				<DownloadTable downloadInfos={downloadInfos} pausedOrPlayButtonPressedEventHandler={ResumeOrPause} retryButtonPressedEventHandler={RetryDownload} focusChangedEventHandler={(info) => { focusedDownloadInfo.current = info }}></DownloadTable>
+				<DownloadTable downloadInfos={downloadInfos} focusedInfo={focusedDownloadInfo} pausedOrPlayButtonPressedEventHandler={ResumeOrPause} retryButtonPressedEventHandler={RetryDownload} focusChangedEventHandler={(info) => { setFocusedDownloadInfo(info) }}></DownloadTable>
 			</div>
 		</div>
 
