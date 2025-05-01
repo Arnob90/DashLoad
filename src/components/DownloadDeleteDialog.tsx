@@ -8,9 +8,10 @@ interface DownloadDeleteDialogProps {
 	deleteConfirmationCallback?: (deleteLocalFile: boolean) => void
 }
 export function DownloadDeleteDialog({ children, deleteConfirmationCallback }: DownloadDeleteDialogProps) {
-	const deleteLocalFileAsWell = useRef(false)
+	const [deleteLocalFileAsWell, setDeleteLocalFileAsWell] = useState(false)
+	const [dialogOpen, setDialogOpen] = useState(false)
 	return (
-		<Dialog>
+		<Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
 			<DialogTrigger asChild>
 				{children}
 			</DialogTrigger>
@@ -23,16 +24,19 @@ export function DownloadDeleteDialog({ children, deleteConfirmationCallback }: D
 					<p>This action cannot be undone</p>
 				</DialogHeader>
 				<div className="flex flex-row gap-3">
-					<Checkbox onChange={(e) => {
-						const sender = e.target as HTMLInputElement
-						deleteLocalFileAsWell.current = sender.checked
+					<Checkbox onCheckedChange={(checked) => {
+						if (checked === "indeterminate") {
+							setDeleteLocalFileAsWell(false)
+						}
+						const checkedStatus = checked.valueOf() as boolean
+						setDeleteLocalFileAsWell(checkedStatus)
 					}} />
 					<Label className="text-red-400">Delete File on Disk</Label>
 				</div>
 				<DialogFooter>
-					<Button variant={"destructive"} onClick={() => deleteConfirmationCallback?.(deleteLocalFileAsWell.current)}>Delete</Button>
+					<Button variant={"destructive"} onClick={() => { deleteConfirmationCallback?.(deleteLocalFileAsWell); setDialogOpen(false) }}>Delete</Button>
 				</DialogFooter>
 			</DialogContent>
-		</Dialog>
+		</Dialog >
 	)
 }

@@ -6,7 +6,7 @@ import { DownloadTable } from "./components/downloadlist";
 import { DownloadInfo, DefaultRequestOpts, downloadsListSchema, DownloadingInfo, DownloadsList } from "./code/DownloadFromServer";
 import { AddDownloadDialogButton } from "./components/AddDownloadDialog";
 import { DownloadDeleteDialog } from "./components/DownloadDeleteDialog"
-import { StartDownload, CancelDownload, PauseDownload, ResumeOrPause, ResumeDownload, RetryDownload } from "./code/FrontendDownloadFunctions";
+import { StartDownload, CancelDownload, PauseDownload, ResumeOrPause, ResumeDownload, RetryDownload, DeleteDownload } from "./code/FrontendDownloadFunctions";
 function useDownloadInfos(): DownloadInfo[] {
 	const [downloadInfos, setDownloadInfos] = useState<DownloadsList>([])
 	const [continueExec, setContinueExec] = useState(true)
@@ -43,12 +43,17 @@ function useMockDownloadInfos() {
 }
 
 export default function App() {
-	const downloadInfos = useMockDownloadInfos()
+	const downloadInfos = useDownloadInfos()
 	const [dialogOpen, setDialogOpen] = useState(false)
 	const [focusedDownloadInfo, setFocusedDownloadInfo] = useState<DownloadInfo | null>(null)
 	async function startDownloadHelper(url: string, filepath: string) {
 		setDialogOpen(false)
 		await StartDownload(url, filepath)
+	}
+	async function DeleteDownloadInfo(deleteLocalFile: boolean = false) {
+		if (focusedDownloadInfo !== null) {
+			await DeleteDownload(focusedDownloadInfo, deleteLocalFile)
+		}
 	}
 	return (
 
@@ -62,14 +67,13 @@ export default function App() {
 					<Button className="w-15 h-15 mx-2 bg-primary p-4" onClick={() => { setDialogOpen(true) }}>
 						<img className="white-svg" src="../assets/plusicon.svg" />
 					</Button>
-					<DownloadDeleteDialog deleteConfirmationCallback={(deleteLocalFile: boolean) => {
-					}}>
+					<DownloadDeleteDialog deleteConfirmationCallback={DeleteDownloadInfo}>
 						<Button className="w-15 h-15 bg-destructive" onMouseDown={(e) => { e.preventDefault() }}>
 							<img className="white-svg" src="../assets/trash-bin-svgrepo-com.svg" />
 						</Button>
 					</DownloadDeleteDialog>
 				</div>
-				<DownloadTable downloadInfos={downloadInfos} focusedInfo={focusedDownloadInfo} pausedOrPlayButtonPressedEventHandler={ResumeOrPause} retryButtonPressedEventHandler={RetryDownload} focusChangedEventHandler={(info) => { setFocusedDownloadInfo(info) }}></DownloadTable>
+				<DownloadTable downloadInfos={downloadInfos} pausedOrPlayButtonPressedEventHandler={ResumeOrPause} retryButtonPressedEventHandler={RetryDownload} focusChangedEventHandler={(info) => { setFocusedDownloadInfo(info) }}></DownloadTable>
 			</div>
 		</div>
 

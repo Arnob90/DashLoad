@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import extras
 import asyncio
 import functools
+import json
 
 
 class SingleMutexClass(abc.ABC):
@@ -30,6 +31,12 @@ def use_mutex(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[An
 class PausedDownload:
     filesize_downloaded: int | None
     filesize: int | None
+
+
+class DownloadInfoJsonObj(BaseModel):
+    url: str
+    etag: str
+    segments: int
 
 
 class DownloadInfoState(BaseModel, abc.ABC):
@@ -69,7 +76,6 @@ class ExtraInfos:
     download_id: str
     url: str
     filepath: str
-    segments: int
 
 
 class Downloader(SingleMutexClass):
@@ -101,15 +107,10 @@ class Downloader(SingleMutexClass):
         downloader.start(download_url, block=False, file_path=str(filepath))
         id = uuid.uuid4().hex
         self.id_to_downloaders.update({id: downloader})
-        multisegmented = extras.supports_range(download_url)
-        number_of_segments:int = 1
-        if multisegmented:
-            number_of_segments = 5
         required_info = ExtraInfos(
             download_id=id,
             url=download_url,
             filepath=filepath_str,
-            segments=number_of_segments
         )
         self.id_to_info.update({id: required_info})
         return id
@@ -198,7 +199,15 @@ class Downloader(SingleMutexClass):
         )
         self.id_to_downloaders[id] = download_state
 
+    async def get_download_info_json(
+        self, filepath: pathlib.Path
+    ) -> DownloadInfoJsonObj:
+        json_obj = DownloadInfoJsonObj.model_validate_json(filepath.read_text())
+        print(json_obj)
+        return json_obj
+
     async def delete_download_task(self, id: str, delete_file_on_disk=False):
+        print(delete_file_on_disk)
         if id not in self.id_to_downloaders:
             return None
         downloader = self.id_to_downloaders[id]
@@ -206,17 +215,23 @@ class Downloader(SingleMutexClass):
             downloader.stop()
         self.id_to_downloaders.pop(id)
         filepath_to_delete = self.id_to_info[id].filepath
-        download_info = self.id_to_info[id]
-        segments = download_info.segments
+        json_path = pathlib.Path(filepath_to_delete + ".json")
+        print(json_path)
+        info_json = await self.get_download_info_json(json_path)
+        segments = info_json.segments
+        print(segments)
         self.id_to_info.pop(id)
         if delete_file_on_disk:
             if segments == 1:
                 to_delete_file = pathlib.Path(filepath_to_delete)
                 to_delete_file.unlink()
                 return
-            for i in range(0,segments):
-                to_delete_file = pathlib.Path(f"{filepath_to_delete}{i}")
+            for i in range(0, segments):
+                to_delete_file = pathlib.Path(f"{filepath_to_delete}.{i}")
+                print("Deleting segmented download")
+                print(str(to_delete_file))
                 to_delete_file.unlink()
+            json_path.unlink()
 
     async def resume_download(self, id: str):
         if id not in self.id_to_downloaders:
@@ -244,4 +259,3 @@ class Downloader(SingleMutexClass):
         )
         await self.delete_download_task(id)
         self.id_to_download_cancelled_infos.update({id: cancelled_info})
-

@@ -73,12 +73,13 @@ interface DeleteRequest {
 	delete_on_disk: boolean
 }
 
-export async function DeleteDownload(info: DownloadInfo,deleteLocalFile: boolean=false) {
-	const deleteRequest:DeleteRequest = {delete_on_disk:deleteLocalFile}
+export async function DeleteDownload(info: DownloadInfo, deleteLocalFile: boolean = false) {
+	console.log(deleteLocalFile)
+	const deleteRequest: DeleteRequest = { delete_on_disk: deleteLocalFile }
 	try {
-		await fetch(`http://localhost:8000/download/delete/${info.download_id}`,{method:"DELETE",headers:DefaultRequestOpts.headers,body:JSON.stringify(deleteRequest)})
+		await fetch(`http://localhost:8000/download/delete/${info.download_id}`, { method: "POST", headers: DefaultRequestOpts.headers, body: JSON.stringify(deleteRequest) })
 	}
-	catch(err) {
+	catch (err) {
 		console.log(err)
 	}
 }

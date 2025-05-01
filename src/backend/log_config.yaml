@@ -1,0 +1,53 @@
+      
+# log_config.yaml
+version: 1
+disable_existing_loggers: False # Keep existing loggers like uvicorn.error
+
+formatters:
+  default:
+    (): uvicorn.logging.DefaultFormatter
+    fmt: "%(levelprefix)s %(message)s"
+    use_colors: True # Set to False if running somewhere without color support
+  access:
+    (): uvicorn.logging.AccessFormatter
+    # Note: The standard format already includes method, path, status etc.
+    fmt: '%(levelprefix)s %(client_addr)s - "%(request_line)s" %(status_code)s'
+    use_colors: True # Set to False if running somewhere without color support
+
+filters:
+  no_successful_get:
+    # Use the dotted path to your custom filter class
+    (): log_filters.NoSuccessfulOrRedirectGetFilter
+
+handlers:
+  default:
+    formatter: default
+    class: logging.StreamHandler
+    stream: ext://sys.stderr # Log general messages (like errors) to stderr
+  access:
+    formatter: access
+    class: logging.StreamHandler
+    stream: ext://sys.stdout # Log access messages to stdout
+    # Apply the custom filter ONLY to the access handler
+    filters: [no_successful_get]
+
+loggers:
+  uvicorn:
+    handlers: [default]
+    level: INFO
+    propagate: False # Prevent uvicorn logs from going to root logger
+  uvicorn.error:
+    level: INFO # Or DEBUG for more verbose error logs
+    handlers: [default] # Use the default handler for errors
+    propagate: False
+  uvicorn.access:
+    handlers: [access] # Use the access handler (which has the filter)
+    level: INFO
+    propagate: False # Prevent access logs from going to root logger
+
+# Optional: Configure the root logger if you have other logging needs
+# root:
+#   level: INFO
+#   handlers: [default]
+
+    

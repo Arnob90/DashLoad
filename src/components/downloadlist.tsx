@@ -9,16 +9,25 @@ import { PauseIcon, PlayIcon, RotateCcw } from "lucide-react"
 import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem } from "@/components/ui/context-menu"
 import clsx from "clsx"
 import { Button } from "@radix-ui/themes";
+import { useKeyHandler } from "../hooks/KeyHandler";
 interface DownloadTableProps {
 	downloadInfos: DownloadInfo[]
 	className?: string
 	pausedOrPlayButtonPressedEventHandler?: (info: DownloadInfo) => void;
 	retryButtonPressedEventHandler?: (info: DownloadInfo) => void
 	focusChangedEventHandler?: (info: DownloadInfo | null) => void
-	focusedInfo: DownloadInfo | null
 }
-export function DownloadTable({ downloadInfos, focusedInfo, pausedOrPlayButtonPressedEventHandler, retryButtonPressedEventHandler, focusChangedEventHandler }: DownloadTableProps) {
-	const focusedRow = useState<DownloadInfo | null>(null)
+export function DownloadTable({ downloadInfos, pausedOrPlayButtonPressedEventHandler, retryButtonPressedEventHandler, focusChangedEventHandler }: DownloadTableProps) {
+
+	const [focusedRow, setFocusedRow] = useState<DownloadInfo | null>(null)
+	function setFocus(info: DownloadInfo | null) {
+		console.log(focusedRow)
+		setFocusedRow(info)
+		focusChangedEventHandler?.(info)
+	}
+	useKeyHandler("Escape", () => {
+		setFocus(null)
+	})
 	const columnHelper = createColumnHelper<DownloadInfo>()
 	const columns = useMemo(() => [
 		columnHelper.accessor('filename', {
@@ -137,7 +146,7 @@ export function DownloadTable({ downloadInfos, focusedInfo, pausedOrPlayButtonPr
 							pausedOrPlayStr = "Pause"
 						}
 						return (
-							<FocusableRow key={row.id} focusClassesMaybe={clsx("outline-none", focusColor)} focused={origRow === focusedInfo} onClick={() => { }}>
+							<FocusableRow key={row.id} focusClassesMaybe={focusColor} focused={origRow.download_id === focusedRow?.download_id} onClick={() => { setFocus(origRow) }}>
 								{
 									row.getVisibleCells().map((cell) => {
 										return <TableCell key={cell.id}>

@@ -5,15 +5,14 @@ export interface FocusableRowProps {
 	focusClassesMaybe?: string
 	children: ReactNode
 	normalClassesMaybe?: string
-	key?: React.Key
 	focused: boolean
 	onClick?: () => void
 }
-export default function FocusableRow({ focusClassesMaybe, focused, children, normalClassesMaybe, key, onClick }: FocusableRowProps) {
+export default function FocusableRow({ focusClassesMaybe, focused, children, normalClassesMaybe, onClick }: FocusableRowProps) {
 	const focusClasses = focusClassesMaybe ?? ""
 	const normalClasses = normalClassesMaybe ?? ""
 	return (
-		<TableRow className={focused ? focusClasses : normalClasses} key={key} onClick={onClick}>
+		<TableRow className={focused ? focusClasses : normalClasses} onClick={onClick}>
 			{children}
 		</TableRow >
 	)

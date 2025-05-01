@@ -7,19 +7,6 @@ import extras
 from typing import Union
 import uvicorn
 
-import logging
-
-
-class SuppressSuccessfulGetFilter(logging.Filter):
-    def filter(self, record):
-        msg = record.getMessage()
-        # Check for successful GETs: status 200 or 304
-        return not ('"GET' in msg and (" 200" in msg or " 304" in msg or "207" in msg))
-
-
-# Apply the filter to Uvicorn's access logger
-access_logger = logging.getLogger("uvicorn.access")
-access_logger.addFilter(SuppressSuccessfulGetFilter())
 
 app = fastapi.FastAPI()
 app.add_middleware(
@@ -94,14 +81,9 @@ async def resume_download(id: str):
     await download_manager.resume_download(id)
 
 
-@app.delete("/download/delete/{id}")
+@app.post("/download/delete/{id}")
 async def delete_download(id: str, request: DeleteRequest):
     await download_manager.delete_download_task(id, request.delete_on_disk)
-
-
-@app.delete("/download/delete/{id}")
-async def delete_download_default(id: str):
-    await download_manager.delete_download_task(id)
 
 
 if __name__ == "__main__":
