@@ -1,0 +1,5 @@
+fastapi==0.115.12
+pydantic==2.11.4
+pypdl==1.5.3
+Requests==2.32.3
+uvicorn==0.34.2
