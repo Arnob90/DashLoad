@@ -26,7 +26,7 @@ These instructions will get you a copy of the project up and running on your loc
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (includes npm) or [Yarn](https://yarnpkg.com/)
+- [Node.js](https://nodejs.org/) (includes npm)
 - [Python](https://www.python.org/) (Version 3.8+ recommended)
 - [pip](https://pip.pypa.io/en/stable/installation/) (Python package installer)
 - [Git](https://git-scm.com/)
