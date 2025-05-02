@@ -111,3 +111,4 @@ npm run start:backend
 - [ ] Bug free and stable
 - [ ] Torrenting
 - [ ] Extensibility
+- [ ] Add tests
