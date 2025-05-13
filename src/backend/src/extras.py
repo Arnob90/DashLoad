@@ -1,4 +1,9 @@
 import requests
+import pathlib
+
+
+def add_extension_to_path(path: pathlib.Path, extension: str):
+    return path.with_name(path.name + extension)
 
 
 def is_valid_download_url(url: str, timeout: float = 5.0) -> bool:
@@ -20,10 +25,6 @@ def is_valid_download_url(url: str, timeout: float = 5.0) -> bool:
         return response.status_code == 200
     except requests.RequestException:
         return False
-
-def supports_range(url:str):
-    res = requests.head(url, allow_redirects=True)
-    return res.headers.get("Accept-Ranges","") == "bytes"
 
 
 class InvalidDownloadUrlError(Exception):

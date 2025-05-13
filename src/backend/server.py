@@ -51,7 +51,8 @@ async def post_request(request: DownloadRequest) -> dict[str, str]:
             request.url, pathlib.Path(request.filepath)
         )
     except extras.InvalidDownloadUrlError:
-        raise fastapi.HTTPException(status_code=404, detail="The given url is invalid")
+        raise fastapi.HTTPException(
+            status_code=404, detail="The given url is invalid")
     return {"id": id}
 
 
