@@ -1,10 +1,12 @@
 import abc
 import logging
 import pathlib
+from typing import Callable
 import pypdl
 from enum import Enum
-
+from hook import Hook
 from pypdl import utils
+from download_cleanup import cleanup_download
 import extras
 
 
@@ -13,15 +15,15 @@ main_logger = logging.getLogger(__name__)
 
 class IDownloader(abc.ABC):
     @abc.abstractmethod
-    def resume_download(self, id: str) -> None:
+    def resume_download(self) -> None:
         pass
 
     @abc.abstractmethod
-    def pause_download(self, id: str) -> None:
+    def pause_download(self) -> None:
         pass
 
     @abc.abstractmethod
-    def cancel_download(self, id: str) -> None:
+    def cancel_download(self) -> None:
         pass
 
     @abc.abstractmethod
@@ -54,6 +56,20 @@ class IDownloader(abc.ABC):
 
     @abc.abstractmethod
     def get_is_paused(self) -> bool:
+        pass
+
+    @abc.abstractmethod
+    def is_cancelled(self) -> bool:
+        pass
+
+    @abc.abstractmethod
+    def connect_delete_request_notify_callable(
+        self, notify_callable: Callable[[], None]
+    ) -> None:
+        pass
+
+    @abc.abstractmethod
+    def delete_download_task(self, delete_on_disk: bool = False) -> None:
         pass
 
 
@@ -77,18 +93,25 @@ class PypdlDownloader(IDownloader):
             download_url, block=False, file_path=str(filepath), headers=headers
         )
         self.paused = False
+        self.cancelled = False
+        self.delete_request_notify_callable = Hook()
+
+    def connect_delete_request_notify_callable(
+        self, notify_callable: Callable[[], None]
+    ) -> None:
+        self.delete_request_notify_callable.connect_with(notify_callable)
 
     def get_is_paused(self) -> bool:
         return self.paused
 
-    def resume_download(self, id: str) -> None:
-        if not self.paused:
-            main_logger.info("Download is not paused")
+    def resume_download(self) -> None:
+        if not self.paused or self.cancelled:
+            main_logger.info("Download is not paused, or cancelled entirely")
             return
         self._downloader.start()
         self.paused = False
 
-    def pause_download(self, id: str) -> None:
+    def pause_download(self) -> None:
         if self.paused:
             main_logger.info("Download is already paused")
             return
@@ -105,7 +128,15 @@ class PypdlDownloader(IDownloader):
         return self._downloader.size
 
     def finished_size(self) -> int | None:
+        if self.cancelled:
+            return 0
         return self._downloader.current_size
+
+    def finished(self) -> bool:
+        return self.succeeded() or self.failed() or self.is_cancelled()
+
+    def is_cancelled(self) -> bool:
+        return self.cancelled
 
     async def get_filepath(self) -> pathlib.Path:
         if self._cached_full_filepath is not None:
@@ -121,6 +152,20 @@ class PypdlDownloader(IDownloader):
 
     def get_download_speed(self) -> int | None:
         return self._downloader.speed
+
+    def cancel_download(self) -> None:
+        self._downloader.stop()
+        cleanup_download(self.filepath)
+        self.cancelled = True
+
+    def delete_download_task(self, delete_on_disk: bool = False) -> None:
+        if not self.finished():
+            # If we are not done, we make sure to clean up, since we don't manage it anymore
+            # After all, resource aquisition is initialization
+            self.cancel_download()
+        if delete_on_disk:
+            cleanup_download(self.filepath)
+        self.delete_request_notify_callable()
 
 
 class DownloadStates(Enum):

@@ -1,6 +1,6 @@
 import pathlib
 import logging
-from downloaditem import cleanup_download
+from download_cleanup import cleanup_download
 from deleter import MockFileDeleter
 from downloadmetainfojson import MockDownloadInfoJsonGetter
 from downloadinfojson import DownloadInfoJsonObj

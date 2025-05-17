@@ -92,3 +92,5 @@ typings/
 out/
 
 src/backend/__pycache__
+src/backend/src/dashload.egg-info
+src/backend/.zed
