@@ -86,7 +86,8 @@ class Downloader(SingleMutexClass):
     def __init__(self) -> None:
         self.id_to_downloaders: dict[str, pypdl.Pypdl | PausedDownload] = {}
         self.id_to_info: dict[str, ExtraInfos] = {}
-        self.id_to_download_cancelled_infos: dict[str, CancelledDownloadInfo] = {}
+        self.id_to_download_cancelled_infos: dict[str, CancelledDownloadInfo] = {
+        }
         self.mutex = asyncio.Lock()
 
     def get_mutex(self):
@@ -202,7 +203,8 @@ class Downloader(SingleMutexClass):
     async def get_download_info_json(
         self, filepath: pathlib.Path
     ) -> DownloadInfoJsonObj:
-        json_obj = DownloadInfoJsonObj.model_validate_json(filepath.read_text())
+        json_obj = DownloadInfoJsonObj.model_validate_json(
+            filepath.read_text())
         print(json_obj)
         return json_obj
 
