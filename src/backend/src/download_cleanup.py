@@ -6,8 +6,6 @@ from downloadmetainfojson import (
 )
 import pathlib
 import extras
-import debugpy
-import os
 
 
 def get_download_info_json_path(download_path: pathlib.Path):
