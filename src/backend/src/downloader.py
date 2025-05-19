@@ -23,7 +23,7 @@ class IDownloader(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def cancel_download(self) -> None:
+    async def cancel_download(self) -> None:
         pass
 
     @abc.abstractmethod
@@ -69,7 +69,7 @@ class IDownloader(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def delete_download_task(self, delete_on_disk: bool = False) -> None:
+    async def delete_download_task(self, delete_on_disk: bool = False) -> None:
         pass
 
 
@@ -139,13 +139,12 @@ class PypdlDownloader(IDownloader):
         return self.cancelled
 
     async def get_filepath(self) -> pathlib.Path:
-        if self._cached_full_filepath is not None:
-            return pathlib.Path(self._cached_full_filepath)
-        full_filepath_str: str = await utils.get_filepath(
+        gotten_filepath = await utils.get_filepath(
             self._url, self.headers, str(self.filepath)
         )
-        self._cached_full_filepath = pathlib.Path(full_filepath_str)
-        return pathlib.Path(self._cached_full_filepath)
+        gotten_filepath_converted = pathlib.Path(gotten_filepath)
+        print(f"Got filepath: {gotten_filepath_converted}")
+        return gotten_filepath_converted
 
     def get_last_url(self) -> str:
         return self._url
@@ -153,18 +152,21 @@ class PypdlDownloader(IDownloader):
     def get_download_speed(self) -> int | None:
         return self._downloader.speed
 
-    def cancel_download(self) -> None:
+    async def cancel_download(self) -> None:
         self._downloader.stop()
-        cleanup_download(self.filepath)
+        recieved_filepath = await self.get_filepath()
+        cleanup_download(recieved_filepath)
         self.cancelled = True
 
-    def delete_download_task(self, delete_on_disk: bool = False) -> None:
+    async def delete_download_task(self, delete_on_disk: bool = False) -> None:
         if not self.finished():
             # If we are not done, we make sure to clean up, since we don't manage it anymore
             # After all, resource aquisition is initialization
-            self.cancel_download()
-        if delete_on_disk:
-            cleanup_download(self.filepath)
+            await self.cancel_download()
+        if self.finished and delete_on_disk:
+            recieved_filepath = await self.get_filepath()
+            print("Recieved filepath: ", recieved_filepath)
+            cleanup_download(recieved_filepath)
         self.delete_request_notify_callable()
 
 

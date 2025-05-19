@@ -6,11 +6,16 @@ from downloadmetainfojson import (
 )
 import pathlib
 import extras
+import debugpy
+import os
 
 
 def get_download_info_json_path(download_path: pathlib.Path):
     json_path = extras.add_extension_to_path(download_path, ".json")
     return json_path
+
+
+# TODO: Fix cleanup
 
 
 def cleanup_download(
@@ -19,6 +24,7 @@ def cleanup_download(
     json_getter: IDownloadInfoJsonGetter = DownloadInfoJsonGetter(),
 ):
     try:
+        print("Gotten download path in cleanup", download_path)
         json_obj = json_getter.get_json(download_path)
         segments = json_obj.segments
         if segments == 1:

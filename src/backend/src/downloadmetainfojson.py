@@ -22,12 +22,11 @@ class DownloadInfoJsonGetter(IDownloadInfoJsonGetter):
     def get_json(
         self, path_to_download: pathlib.Path
     ) -> downloadinfojson.DownloadInfoJsonObj:
-        if not path_to_download.exists():
-            raise DownloadMetadataMissingError(path_to_download)
         json_path = extras.add_extension_to_path(path_to_download, ".json")
+        if not json_path.exists():
+            raise DownloadMetadataMissingError(json_path)
         json_str = json_path.read_text()
-        json_obj = downloadinfojson.DownloadInfoJsonObj.model_validate_json(
-            json_str)
+        json_obj = downloadinfojson.DownloadInfoJsonObj.model_validate_json(json_str)
         return json_obj
 
 

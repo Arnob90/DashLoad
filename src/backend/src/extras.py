@@ -3,7 +3,10 @@ import pathlib
 
 
 def add_extension_to_path(path: pathlib.Path, extension: str):
-    return path.with_name(path.name + extension)
+    print(f"Adding {extension} to {path}")
+    added_path = pathlib.Path(f"{path}{extension}")
+    print(added_path)
+    return added_path
 
 
 def is_valid_download_url(url: str, timeout: float = 5.0) -> bool:

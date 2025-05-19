@@ -35,13 +35,11 @@ class DownloadStartResponse(BaseModel):
     id: str
 
 
-DownloadStateVariants = list[
-    Union[
-        downloadstates.DownloadingInfo,
-        downloadstates.PausedDownloadInfo,
-        downloadstates.FailedDownloadInfo,
-        downloadstates.SucceededDownloadInfo,
-    ]
+DownloadStateVariants = Union[
+    downloadstates.DownloadingInfo,
+    downloadstates.PausedDownloadInfo,
+    downloadstates.FailedDownloadInfo,
+    downloadstates.SucceededDownloadInfo,
 ]
 
 
@@ -59,19 +57,22 @@ async def post_request(request: DownloadRequest) -> DownloadStartResponse:
     try:
         id = dl_manager.add_download_item(
             downloaditem.DownloadItem(
-                downloader.PypdlDownloader(
-                    request.url, pathlib.Path(request.filepath))
+                downloader.PypdlDownloader(request.url, pathlib.Path(request.filepath))
             )
         )
     except extras.InvalidDownloadUrlError:
-        raise fastapi.HTTPException(
-            status_code=404, detail="The given url is invalid")
+        raise fastapi.HTTPException(status_code=404, detail="The given url is invalid")
     return DownloadStartResponse(id=id)
 
 
 @app.get("/download/{id}", response_model=DownloadStateVariants)
 async def get_by_id(id: str):
-    required_task = await dl_manager.get_download_info_by_id(id)
+    try:
+        required_task = await dl_manager.get_download_info_by_id(id)
+    except KeyError:
+        raise fastapi.HTTPException(
+            status_code=404, detail="The required download does not exist"
+        )
     return required_task
 
 
@@ -87,7 +88,7 @@ async def pause_download(id: str):
 
 @app.post("/download/stop/{id}")
 async def stop_download(id: str):
-    dl_manager.get_download_item(id).download_task.cancel_download()
+    await dl_manager.get_download_item(id).download_task.cancel_download()
 
 
 @app.post("/download/resume/{id}")
@@ -98,7 +99,7 @@ async def resume_download(id: str):
 @app.post("/download/delete/{id}")
 async def delete_download(id: str, request: DeleteRequest):
     delete_from_file = request.delete_on_disk
-    dl_manager.get_download_item(id).download_task.delete_download_task(
+    await dl_manager.get_download_item(id).download_task.delete_download_task(
         delete_from_file
     )
 
