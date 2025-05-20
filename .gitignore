@@ -102,3 +102,6 @@ src/backend/src/dashload_backend.egg-info
 src/backend/test/__pycache__
 src/backend/test/integration/__pycache__
 src/backend/test/unit/__pycache__
+src/build/server
+src/server.spec
+server.spec
