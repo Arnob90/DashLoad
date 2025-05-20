@@ -55,6 +55,12 @@ These instructions will get you a copy of the project up and running on your loc
      pip install -r requirements.txt
      ```
 
+   - Turn it into editable install
+
+   ```bash
+    pip install -e .
+   ```
+
 3. **Set up the React Frontend:**
 
    - Install Node.js dependencies:
@@ -111,4 +117,4 @@ npm run start:backend
 - [ ] Bug free and stable
 - [ ] Torrenting
 - [ ] Extensibility
-- [ ] Add tests
+- [x] Add tests
