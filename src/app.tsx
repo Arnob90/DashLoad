@@ -7,6 +7,8 @@ import { DownloadInfo, DefaultRequestOpts, downloadsListSchema, DownloadingInfo,
 import { AddDownloadDialogButton } from "./components/AddDownloadDialog";
 import { DownloadDeleteDialog } from "./components/DownloadDeleteDialog"
 import { StartDownload, CancelDownload, PauseDownload, ResumeOrPause, ResumeDownload, RetryDownload, DeleteDownload } from "./code/FrontendDownloadFunctions";
+import addSvg from "../assets/plusicon.svg"
+import deleteSvg from "../assets/trash-bin-svgrepo-com.svg"
 function useDownloadInfos(): DownloadInfo[] {
 	const [downloadInfos, setDownloadInfos] = useState<DownloadsList>([])
 	const [continueExec, setContinueExec] = useState(true)
@@ -65,11 +67,11 @@ export default function App() {
 			<div className="flex flex-col">
 				<div className="flex w-full py-2 border-2 border-b-gray-600 sticky">
 					<Button className="w-15 h-15 mx-2 bg-primary p-4" onClick={() => { setDialogOpen(true) }}>
-						<img className="white-svg" src="../assets/plusicon.svg" />
+						<img className="white-svg" src={addSvg} />
 					</Button>
 					<DownloadDeleteDialog deleteConfirmationCallback={DeleteDownloadInfo}>
 						<Button className="w-15 h-15 bg-destructive" onMouseDown={(e) => { e.preventDefault() }}>
-							<img className="white-svg" src="../assets/trash-bin-svgrepo-com.svg" />
+							<img className="white-svg" src={deleteSvg} />
 						</Button>
 					</DownloadDeleteDialog>
 				</div>

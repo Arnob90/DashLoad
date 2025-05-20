@@ -10,11 +10,13 @@ import time
 import pathlib
 
 main_logger = logging.getLogger(__name__)
-client = TestClient(app)
+client = TestClient(app, raise_server_exceptions=True)
+main_logger.setLevel(logging.DEBUG)
+
+path_to_test_downloads = pathlib.Path(__file__).parent.parent / "test_download_path"
 
 
 def test_download_and_pause():
-    path_to_test_downloads = pathlib.Path(__file__).parent.parent / "test_download_path"
     logging.info(path_to_test_downloads)
     download_req = DownloadRequest(
         url="http://ipv4.download.thinkbroadband.com/1GB.zip",
@@ -23,7 +25,6 @@ def test_download_and_pause():
     response: httpx.Response = client.post("/download/", json=download_req.model_dump())
     assert response.status_code == 200
     response_json = response.json()
-    # Test schema
     res_body = DownloadStartResponse.model_validate(response_json)
     current_info = client.get(f"/download/{res_body.id}")
     current_info_json = current_info.json()
@@ -39,3 +40,12 @@ def test_download_and_pause():
     res_after_delete = client.get(f"/download/{res_body.id}")
     assert res_after_delete.status_code == 404
     assert res.status_code == 200
+
+
+def test_invalid_url():
+    download_req = DownloadRequest(
+        url="invalid url",
+        filepath=str(path_to_test_downloads),
+    )
+    response: httpx.Response = client.post("/download/", json=download_req.model_dump())
+    assert response.status_code == 404

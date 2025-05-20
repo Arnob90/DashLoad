@@ -1,2 +1,5 @@
 __pycache__/
 dashload_backend.egg-info/
+# No compilation logs
+dist/
+build/
