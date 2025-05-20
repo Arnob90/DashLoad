@@ -109,12 +109,13 @@ npm run start:backend
 - Feel free to fork if you feel like your PR will do much good.
 - Please be nice.
 
-### Roadmap
+### Roadmap(in order)
 
 - [x] Core download logic
 - [x] Multi-segmented downloads
-- [ ] Performance optimization(maybe move away from electron/python)
-- [ ] Bug free and stable
-- [ ] Torrenting
-- [ ] Extensibility
 - [x] Add tests
+- [] Serialization and deserialization of downloads(dowloads remain even after restart, working on it currently)
+- [ ] Torrenting
+- [ ] Bug free and stable
+- [ ] Performance optimization(maybe move away from electron/python)
+- [ ] Extensibility
