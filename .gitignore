@@ -105,3 +105,4 @@ src/backend/test/unit/__pycache__
 src/build/server
 src/server.spec
 server.spec
+build/server

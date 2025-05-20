@@ -11,6 +11,15 @@ if (started) {
 	app.quit();
 }
 let backendProcess: ChildProcess | null = null;
+function cleanup_backend() {
+	if (backendProcess !== null) {
+		if (backendProcess.pid !== undefined) {
+			treeKill(backendProcess.pid)
+		}
+		backendProcess.kill()
+	}
+	backendProcess = null
+}
 const createWindow = () => {
 	// Create the browser window.
 	const mainWindow = new BrowserWindow({
@@ -48,6 +57,7 @@ app.on('ready', () => {
 // explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
 	if (process.platform !== 'darwin') {
+		cleanup_backend()
 		app.quit();
 	}
 });
@@ -60,16 +70,6 @@ app.on('activate', () => {
 	}
 });
 
-function cleanup_backend() {
-	if (backendProcess !== null) {
-		if (backendProcess.pid !== undefined) {
-			treeKill(backendProcess.pid)
-		}
-		else {
-			backendProcess.kill()
-		}
-	}
-}
 
 app.on("before-quit", cleanup_backend)
 
