@@ -7,10 +7,12 @@ import { dialog } from 'electron';
 import { spawn } from 'node:child_process';
 import { ChildProcess } from "node:child_process"
 import treeKill from 'tree-kill';
+import uuid from "uuid";
 if (started) {
 	app.quit();
 }
 let backendProcess: ChildProcess | null = null;
+let uuidOfBackend: string | null = null
 function cleanup_backend() {
 	if (backendProcess !== null) {
 		if (backendProcess.pid !== undefined) {
@@ -45,9 +47,9 @@ const createWindow = () => {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.on('ready', () => {
-	const backend_bin_path = path.join(process.resourcesPath, "server")
+	const backendBinPath = path.join(process.resourcesPath, "server")
 	if (!isDev) {
-		backendProcess = spawn(backend_bin_path)
+		backendProcess = spawn(backendBinPath)
 	}
 	createWindow();
 });

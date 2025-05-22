@@ -10,13 +10,13 @@ class DownloadItem:
         self.download_task = download_task
 
     async def get_download_state(self) -> downloadstates.DownloadInfoState:
-        self.filepath = await self.download_task.get_filepath()
-        filename = pathlib.Path(self.filepath).name
+        filepath = await self.download_task.get_filepath()
+        filename = pathlib.Path(filepath).name
         if self.download_task.get_is_paused():
             return downloadstates.PausedDownloadInfo(
                 download_id=self.download_id,
                 filename=str(filename),
-                filepath=str(self.filepath),
+                filepath=str(filepath),
                 filesize=self.download_task.size(),
                 last_url=self.download_task.get_last_url(),
                 downloaded_file_portion=self.download_task.finished_size(),
@@ -25,7 +25,7 @@ class DownloadItem:
             return downloadstates.SucceededDownloadInfo(
                 download_id=self.download_id,
                 filename=str(filename),
-                filepath=str(self.filepath),
+                filepath=str(filepath),
                 filesize=self.download_task.size(),
                 last_url=self.download_task.get_last_url(),
             )
@@ -33,7 +33,7 @@ class DownloadItem:
             return downloadstates.FailedDownloadInfo(
                 download_id=self.download_id,
                 filename=str(filename),
-                filepath=str(self.filepath),
+                filepath=str(filepath),
                 filesize=self.download_task.size(),
                 last_url=self.download_task.get_last_url(),
             )
@@ -41,7 +41,7 @@ class DownloadItem:
             return downloadstates.CancelledDownloadInfo(
                 download_id=self.download_id,
                 filename=str(filename),
-                filepath=str(self.filepath),
+                filepath=str(filepath),
                 filesize=self.download_task.size(),
                 last_url=self.download_task.get_last_url(),
             )
@@ -49,7 +49,7 @@ class DownloadItem:
             return downloadstates.DownloadingInfo(
                 download_id=self.download_id,
                 filename=str(filename),
-                filepath=str(self.filepath),
+                filepath=str(filepath),
                 filesize=self.download_task.size(),
                 last_url=self.download_task.get_last_url(),
                 downloaded_file_portion=self.download_task.finished_size(),

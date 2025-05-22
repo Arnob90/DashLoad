@@ -23,6 +23,11 @@ class IDownloader(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def _start(self):
+        """Starts downloading. SHOULD ONLY BE CALLED FROM DOWNLOAD MANAGER.
+        DO NOT CALL FROM OUTSIDE"""
+
+    @abc.abstractmethod
     async def cancel_download(self) -> None:
         pass
 
@@ -89,9 +94,12 @@ class PypdlDownloader(IDownloader):
         self._cached_full_filepath: pathlib.Path | None = None
         self.filepath = filepath
         self.headers = headers
-        self._downloader.start(
-            download_url, block=False, file_path=str(filepath), headers=headers
-        )
+        self.download_start_args = (download_url,)
+        self.download_start_kwargs = {
+            "block": False,
+            "file_path": str(filepath),
+            "headers": headers,
+        }
         self.paused = False
         self.cancelled = False
         self.delete_request_notify_callable = Hook()
@@ -157,6 +165,9 @@ class PypdlDownloader(IDownloader):
         recieved_filepath = await self.get_filepath()
         cleanup_download(recieved_filepath)
         self.cancelled = True
+
+    def _start(self):
+        self._downloader.start(*self.download_start_args, **self.download_start_kwargs)
 
     async def delete_download_task(self, delete_on_disk: bool = False) -> None:
         if not self.finished():
