@@ -14,3 +14,14 @@ contextBridge.exposeInMainWorld("electronApi", {
 	}
 }
 )
+
+contextBridge.exposeInMainWorld('downloads', {
+	download: (url: string, filepath: string) => ipcRenderer.invoke('download:download', url, filepath),
+	pause: (id: string) => ipcRenderer.invoke('download:pause', id),
+	resume: (id: string) => ipcRenderer.invoke('download:resume', id),
+	getInfos: () => ipcRenderer.invoke('download:infos'),
+	getInfo: (id: string) => ipcRenderer.invoke('download:info', id),
+	pauseOrResume: (id: string) => ipcRenderer.invoke('download:pauseOrResume', id),
+	cancel: (id: string) => ipcRenderer.invoke('download:cancel', id),
+	delete: (id: string, deleteOnDisk: boolean) => ipcRenderer.invoke('download:delete', id, deleteOnDisk)
+});

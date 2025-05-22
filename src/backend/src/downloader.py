@@ -161,6 +161,8 @@ class PypdlDownloader(IDownloader):
         return self._downloader.speed
 
     async def cancel_download(self) -> None:
+        if self._downloader.completed:
+            raise ValueError("Download is already completed")
         self._downloader.stop()
         recieved_filepath = await self.get_filepath()
         cleanup_download(recieved_filepath)
