@@ -8,13 +8,11 @@ import { spawn } from 'node:child_process';
 import { ChildProcess } from "node:child_process"
 import treeKill from 'tree-kill';
 import uuid from "uuid";
-import { DefaultRequestOpts, DownloadActions } from './code/DownloadFromServer';
 if (started) {
 	app.quit();
 }
 let backendProcess: ChildProcess | null = null;
 let uuidOfBackend: string | null = null
-let downloader: DownloadActions
 function cleanup_backend() {
 	if (backendProcess !== null) {
 		if (backendProcess.pid !== undefined) {
@@ -52,8 +50,6 @@ app.on('ready', () => {
 	const backendBinPath = path.join(process.resourcesPath, "server")
 	if (!isDev) {
 		backendProcess = spawn(backendBinPath)
-		uuidOfBackend = uuid.v4()
-		downloader = new DownloadActions(new DefaultRequestOpts(uuidOfBackend).fullHeaders)
 	}
 	createWindow();
 });
@@ -111,29 +107,3 @@ ipcMain.handle("getMiscJson", async (_) => {
 	}
 	return JSON.parse(readJson);
 })
-
-
-ipcMain.handle('download:download', (_, url: string, filepath: string) =>
-	downloader.download(url, filepath)
-);
-ipcMain.handle('download:pause', (_, id: string) =>
-	downloader.pause(id)
-);
-ipcMain.handle('download:resume', (_, id: string) =>
-	downloader.resume(id)
-);
-ipcMain.handle('download:infos', () =>
-	downloader.getDownloadInfos()
-);
-ipcMain.handle('download:info', (_, id: string) =>
-	downloader.getDownloadInfo(id)
-);
-ipcMain.handle('download:pauseOrResume', (_, id: string) =>
-	downloader.pauseOrResume(id)
-);
-ipcMain.handle('download:cancel', (_, id: string) =>
-	downloader.cancelDownload(id)
-);
-ipcMain.handle('download:delete', (_, id: string, deleteOnDisk: boolean) =>
-	downloader.deleteDownload(id, deleteOnDisk)
-);

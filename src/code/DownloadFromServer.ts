@@ -52,6 +52,7 @@ export const downloadInfoUnionSchema = z.discriminatedUnion('type', [
 	failedDownloadInfoSchema,
 	succeededDownloadInfoSchema,
 ]);
+
 // 7. Create the final schema for the API response (a list/array of the union)
 export const downloadsListSchema = z.array(downloadInfoUnionSchema);
 
@@ -76,19 +77,6 @@ export type DownloadsList = z.infer<typeof downloadsListSchema>;
 // 	filename: string | null
 // 	filepath: string
 // }
-export const DownloadRequestSchema = z.object({
-	url: z.string().url(),
-	filepath: z.string(),
-})
-export const DownloadRequestResponseSchema = z.object({
-	id: z.string()
-})
-export const DeleteRequest = z.object({
-	delete_on_disk: z.boolean()
-})
-export type DownloadRequestResponse = z.infer<typeof DownloadRequestResponseSchema>
-export type DownloadRequest = z.infer<typeof DownloadRequestSchema>
-export type DeleteRequest = z.infer<typeof DeleteRequest>
 interface Headers {
 	Accept: string,
 	'Content-Type': string
@@ -109,84 +97,6 @@ export class DefaultRequestOpts {
 			'x-session-token': secret
 
 		}
-	}
-}
-export class DownloadActions {
-	private givenHeaders: HeadersWithSecret
-	constructor(givenHeaders: HeadersWithSecret) {
-		this.givenHeaders = givenHeaders
-	}
-	async download(url: string, filepath: string): Promise<DownloadRequestResponse> {
-		const request: DownloadRequest = { filepath: filepath, url: url }
-		const res = await fetch("http://localhost:8000/download", {
-			method: "POST",
-			body: JSON.stringify(request),
-			headers: { ...this.givenHeaders }
-		})
-		if (!res.ok) {
-			throw new Error(`Server error ${res.status}: ${res.statusText}`);
-		}
-		const res_json = await res.json()
-		const requiredRes: DownloadRequestResponse = DownloadRequestResponseSchema.parse(res_json)
-		return requiredRes
-	}
-	async pause(id: string) {
-		await fetch(`http://localhost:8000/download/pause/${id}`, {
-			method: "POST",
-			headers: { ...this.givenHeaders }
-		})
-	}
-	async resume(id: string) {
-		await fetch(`http://localhost:8000/download/resume/${id}`, {
-			method: "POST",
-			headers: { ...this.givenHeaders }
-		})
-	}
-	async getDownloadInfos(): Promise<DownloadsList> {
-		const res = await fetch("http://localhost:8000/download", {
-			method: "GET",
-			headers: { ...this.givenHeaders }
-		})
-		if (!res.ok) {
-			throw new Error(`Server error ${res.status}: ${res.statusText}`);
-		}
-		const res_json = await res.json()
-		const requiredRes: DownloadsList = downloadsListSchema.parse(res_json)
-		return requiredRes
-	}
-	async getDownloadInfo(id: string) {
-		const res = await fetch(`http://localhost:8000/download/${id}`, {
-			method: "GET",
-			headers: { ...this.givenHeaders }
-		})
-		if (!res.ok) {
-			throw new Error(`Server error ${res.status}: ${res.statusText}`);
-		}
-		const res_json = await res.json()
-		const requiredRes: DownloadInfo = downloadInfoUnionSchema.parse(res_json)
-		return requiredRes
-	}
-	async pauseOrResume(id: string) {
-		const requiredInfo = await this.getDownloadInfo(id)
-		if (requiredInfo.type === "DownloadingInfo") {
-			await this.pause(id)
-		}
-		else if (requiredInfo.type === "PausedDownloadInfo") {
-			await this.resume(id)
-		}
-		else {
-			throw new Error("Cannot pause or resume a download that isn't even running or paused")
-		}
-	}
-	async cancelDownload(id: string) {
-		await fetch(`http://localhost:8000/download/stop/${id}`, {
-			method: "POST",
-			headers: { ...this.givenHeaders }
-		})
-	}
-	async deleteDownload(id: string, deleteOnDisk: boolean) {
-		const deleteRequest: DeleteRequest = { delete_on_disk: deleteOnDisk }
-		await fetch(`http://localhost:8000/download/delete/${id}`, { method: "POST", headers: { ...this.givenHeaders }, body: JSON.stringify(deleteRequest) })
 	}
 }
 export class DownloadInfoActions {
