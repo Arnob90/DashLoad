@@ -13,3 +13,5 @@ dependencies = [
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["test"]
+log_cli = true
+log_cli_level = "INFO"

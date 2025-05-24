@@ -11,6 +11,9 @@ contextBridge.exposeInMainWorld("electronApi", {
 	},
 	getMiscJson: async (): Promise<any | null> => {
 		return await ipcRenderer.invoke("getMiscJson")
+	},
+	getUuid: async (): Promise<string | null> => {
+		return await ipcRenderer.invoke("getUuid")
 	}
 }
 )

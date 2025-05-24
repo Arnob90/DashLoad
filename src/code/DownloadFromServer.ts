@@ -1,3 +1,4 @@
+import { Header } from "@tanstack/react-table";
 import { z } from "zod"
 
 // 1. Base Schema corresponding to DownloadInfoState (excluding the 'type' field for now)
@@ -76,10 +77,26 @@ export type DownloadsList = z.infer<typeof downloadsListSchema>;
 // 	filename: string | null
 // 	filepath: string
 // }
+interface Headers {
+	Accept: string,
+	'Content-Type': string
+}
+interface HeadersWithSecret extends Headers {
+	'x-session-token': string
+}
 export class DefaultRequestOpts {
-	static headers = {
+	// Will soon be made private as uuidless use is deprecated
+	static headers: Headers = {
 		'Accept': 'application/json',
 		'Content-Type': 'application/json'
+	}
+	fullHeaders: HeadersWithSecret
+	public constructor(secret: string) {
+		this.fullHeaders = {
+			...DefaultRequestOpts.headers,
+			'x-session-token': secret
+
+		}
 	}
 }
 export class DownloadInfoActions {

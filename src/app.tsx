@@ -6,7 +6,7 @@ import { DownloadTable } from "./components/downloadlist";
 import { DownloadInfo, DefaultRequestOpts, downloadsListSchema, DownloadingInfo, DownloadsList } from "./code/DownloadFromServer";
 import { AddDownloadDialogButton } from "./components/AddDownloadDialog";
 import { DownloadDeleteDialog } from "./components/DownloadDeleteDialog"
-import { StartDownload, CancelDownload, PauseDownload, ResumeOrPause, ResumeDownload, RetryDownload, DeleteDownload } from "./code/FrontendDownloadFunctions";
+import { GetDownloads, StartDownload, CancelDownload, PauseDownload, ResumeOrPause, ResumeDownload, RetryDownload, DeleteDownload } from "./code/FrontendDownloadFunctions";
 import addSvg from "../assets/plusicon.svg"
 import deleteSvg from "../assets/trash-bin-svgrepo-com.svg"
 function useDownloadInfos(): DownloadInfo[] {
@@ -15,12 +15,7 @@ function useDownloadInfos(): DownloadInfo[] {
 	let requestBody: any;
 	async function updateDownloadInfos() {
 		try {
-			const request = await fetch("http://localhost:8000/download", {
-				method: "GET",
-				headers: DefaultRequestOpts.headers
-			})
-			requestBody = await request.json()
-			const requestItem = downloadsListSchema.parse(requestBody)
+			const requestItem = await GetDownloads()
 			setDownloadInfos(requestItem)
 		}
 		catch (err) {

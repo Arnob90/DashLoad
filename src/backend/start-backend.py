@@ -19,7 +19,7 @@ def main():
     script_file = Path(__file__).resolve()
     project_root = script_file.parent
     venv_dir = project_root / "venv"
-    log_cfg = project_root / "log_config.yaml"
+    app_dir = project_root / "src" / "server.py"
 
     # Make sure we run from project root
     original_cwd = Path.cwd()
@@ -38,19 +38,10 @@ def main():
     # and call [str(uvicorn_bin), "--reload", "server:app", "--log-config", str(log_cfg)]
 
     # But using `python -m uvicorn` ensures it's the one installed in your venv:
-    cmd = [
-        str(python_exe),
-        "-m",
-        "uvicorn",
-        "server:app",
-        "--reload",
-        "--log-config",
-        str(log_cfg),
-    ]
+    cmd: list[str] = [str(python_exe), str(app_dir), *sys.argv[1:]]
 
     print(f"🚀 Running: {' '.join(cmd)}")
-    subprocess.run(cmd, check=True)
-
+    subprocess.run(cmd, stdout=sys.stdout, stderr=sys.stderr)
     # Restore original working directory
     os.chdir(original_cwd)
 

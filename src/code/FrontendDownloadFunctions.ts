@@ -1,4 +1,4 @@
-import { DownloadInfo, DefaultRequestOpts, downloadsListSchema, DownloadingInfo, DownloadsList } from "../code/DownloadFromServer";
+import { DefaultRequestOpts, downloadsListSchema, downloadInfoUnionSchema, DownloadInfo } from "../code/DownloadFromServer";
 export interface DownloadRequest {
 	url: string
 	filepath: string
@@ -6,16 +6,48 @@ export interface DownloadRequest {
 export interface DownloadRequestResponse {
 	id: string
 }
+class HeadersGetter {
+	static cachedUuid: string | null = null
+	static async getHeaders() {
+		if (HeadersGetter.cachedUuid === null) {
+			HeadersGetter.cachedUuid = await window.electronApi.getUuid()
+		}
+		if (HeadersGetter.cachedUuid === null) {
+			throw new Error("Cannot get uuid")
+		}
+		const requestOpts = new DefaultRequestOpts(HeadersGetter.cachedUuid)
+		return { ...requestOpts.fullHeaders }
+	}
+}
+export async function GetDownloads() {
+	const request = await fetch("http://localhost:8000/download", {
+		method: "GET",
+		headers: await HeadersGetter.getHeaders()
+	})
+	const requestBody = await request.json()
+	const requestItem = downloadsListSchema.parse(requestBody)
+	return requestItem
+}
+export async function GetDownload() {
+	const request = await fetch(`http://localhost:8000/download/{id}`, {
+		method: "GET",
+		headers: await HeadersGetter.getHeaders()
+	})
+	const requestBody = await request.json()
+	const requestItem: DownloadInfo = downloadInfoUnionSchema.parse(requestBody)
+	return requestItem
+}
 export async function StartDownload(url: string, filepath: string) {
 	const request: DownloadRequest = { filepath: filepath, url: url }
 	await fetch("http://localhost:8000/download", {
 		method: "POST",
 		body: JSON.stringify(request),
-		headers: DefaultRequestOpts.headers
+		headers: await HeadersGetter.getHeaders()
 	})
 }
 export async function CancelDownload(info: DownloadInfo) {
-	fetch(`http://localhost:8000/download/cancel/${info.download_id}`, {
+	await fetch(`http://localhost:8000/download/cancel/${info.download_id}`, {
+		headers: await HeadersGetter.getHeaders()
 	})
 }
 export async function PauseDownload(info: DownloadInfo) {
@@ -29,7 +61,7 @@ export async function PauseDownload(info: DownloadInfo) {
 	}
 	const res = await fetch(`http://localhost:8000/download/pause/${id}`, {
 		method: "POST",
-		headers: DefaultRequestOpts.headers
+		headers: await HeadersGetter.getHeaders()
 	})
 	if (!res.ok) {
 		throw new Error("Cannot pause download")
@@ -45,7 +77,7 @@ export async function ResumeDownload(info: DownloadInfo) {
 	}
 	try {
 		await fetch(`http://localhost:8000/download/resume/${id}`, {
-			headers: DefaultRequestOpts.headers,
+			headers: await HeadersGetter.getHeaders(),
 			method: "POST"
 		})
 	}
@@ -77,7 +109,7 @@ export async function DeleteDownload(info: DownloadInfo, deleteLocalFile: boolea
 	console.log(deleteLocalFile)
 	const deleteRequest: DeleteRequest = { delete_on_disk: deleteLocalFile }
 	try {
-		await fetch(`http://localhost:8000/download/delete/${info.download_id}`, { method: "POST", headers: DefaultRequestOpts.headers, body: JSON.stringify(deleteRequest) })
+		await fetch(`http://localhost:8000/download/delete/${info.download_id}`, { method: "POST", headers: await HeadersGetter.getHeaders(), body: JSON.stringify(deleteRequest) })
 	}
 	catch (err) {
 		console.log(err)
