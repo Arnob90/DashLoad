@@ -96,3 +96,12 @@ class InvalidPathError(Exception):
 class SecretMissingError(Exception):
     def __init__(self, msg="The secret key wasn't passed in") -> None:
         super().__init__(msg)
+
+
+class DownloadIdMissingError(Exception):
+    def __init__(
+        self,
+        msg="The required download doesn't even have an id. \
+        How is that possible?!",
+    ) -> None:
+        super().__init__(msg)

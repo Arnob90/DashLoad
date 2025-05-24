@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from pydantic import BaseModel
 import abc
+from typing import Union
 
 
 @dataclass(frozen=True)
@@ -45,3 +46,12 @@ class SucceededDownloadInfo(DownloadInfoState):
 
 class CancelledDownloadInfo(DownloadInfoState):
     type: str = "CancelledDownloadInfo"
+
+
+DownloadStateVariants = Union[
+    DownloadingInfo,
+    PausedDownloadInfo,
+    FailedDownloadInfo,
+    SucceededDownloadInfo,
+    CancelledDownloadInfo,
+]

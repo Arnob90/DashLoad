@@ -12,6 +12,8 @@ import pathlib
 import argparse
 import logging
 import os
+import json
+from downloadstates import DownloadStateVariants
 
 main_logger = logging.getLogger(__name__)
 app = fastapi.FastAPI()
@@ -57,6 +59,14 @@ class DownloadStartResponse(BaseModel):
     id: str
 
 
+class SerializeDownloadInfoRequest(BaseModel):
+    filepath_to_serialize_to: str
+
+
+class DeserializeDownloadInfoRequest(BaseModel):
+    filepath_to_deserialize_from: str
+
+
 DownloadStateVariants = Union[
     downloadstates.DownloadingInfo,
     downloadstates.PausedDownloadInfo,
@@ -83,13 +93,11 @@ async def post_request(
     try:
         id = await dl_manager.add_download_item(
             downloaditem.DownloadItem(
-                downloader.PypdlDownloader(
-                    request.url, pathlib.Path(request.filepath)),
+                downloader.PypdlDownloader(request.url, pathlib.Path(request.filepath)),
             ),
         )
     except extras.InvalidDownloadUrlError:
-        raise fastapi.HTTPException(
-            status_code=404, detail="The given url is invalid")
+        raise fastapi.HTTPException(status_code=404, detail="The given url is invalid")
     except extras.DownloadToAnExistingPathError as err:
         raise fastapi.HTTPException(status_code=409, detail=str(err))
     return DownloadStartResponse(id=id)
@@ -142,6 +150,27 @@ async def delete_download(
     )
 
 
+@app.post("/download/serialize")
+async def serialize_downloads(
+    request: SerializeDownloadInfoRequest,
+    x_session_token: Annotated[str, fastapi.Header()],
+):
+    assert SecretHolderSingleton.verify_secret(x_session_token)
+    serialized_infos = await dl_manager.serialize_download_infos()
+    with open(request.filepath_to_serialize_to, "w") as f:
+        json.dump(serialized_infos, f)
+
+
+@app.post("/download/deserialize")
+async def deserialize_downloads(
+    request: DeserializeDownloadInfoRequest,
+    x_session_token: Annotated[str, fastapi.Header()],
+):
+    assert SecretHolderSingleton.verify_secret(x_session_token)
+    with open(request.filepath_to_deserialize_from, "r") as f:
+        serialized_infos = json.load(f)
+
+
 @app.post("/shutdown")
 async def shutdown(x_session_token: Annotated[str, fastapi.Header()]):
     assert SecretHolderSingleton.verify_secret(x_session_token)
@@ -155,6 +184,7 @@ if __name__ == "__main__":
         prog="dashload-backend", description="Backend for the dashload download manager"
     )
     parser.add_argument("secret_key")
+    parser.add_argument("serialize_downloads_path")
     args = parser.parse_args()
     secret_key = args.secret_key
     SecretHolderSingleton.set_holder(extras.SecretHolder(secret_key))

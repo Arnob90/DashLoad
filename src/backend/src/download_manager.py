@@ -2,13 +2,20 @@ from os import path
 import pathlib
 from typing import Coroutine, List
 from typing import Any
+from downloader import PypdlDownloader
 import downloaditem
 import asyncio
 import downloadstates
 from extras import DownloadToAnExistingPathError, ISecretHolder, SecretHolder
 import logging
+from pydantic import BaseModel
+import extras
 
 main_logger = logging.getLogger(__name__)
+
+
+class SerializedDownloadItems(BaseModel):
+    download_items: dict[str, downloadstates.DownloadInfoState]
 
 
 class DownloadManager:
@@ -63,3 +70,29 @@ class DownloadManager:
         for download_item in self.download_items.values():
             download_state_futures.append(download_item.get_download_state())
         return await asyncio.gather(*download_state_futures)
+
+    async def serialize_download_infos(
+        self,
+    ) -> SerializedDownloadItems:
+        result_dict: dict[str, downloadstates.DownloadInfoState] = {}
+        download_infos = await self.get_all_download_infos()
+        for download_info in download_infos:
+            if download_info.download_id is None:
+                raise extras.DownloadIdMissingError()
+            result_dict[download_info.download_id] = download_info
+        return SerializedDownloadItems(download_items=result_dict)
+
+    async def deserialize_from_download_infos(
+        self, download_infos: dict[str, downloadstates.DownloadInfoState]
+    ):
+        for download_id, download_info in download_infos.items():
+            if download_info.download_id is None:
+                raise extras.DownloadIdMissingError()
+            await self.add_download_item(
+                downloaditem.DownloadItem(
+                    PypdlDownloader(
+                        download_info.last_url, pathlib.Path(download_info.filepath)
+                    ),
+                    download_id,
+                )
+            )

@@ -1,12 +1,15 @@
 import pathlib
+from typing import Optional
 import downloadstates
 import uuid
 import downloader
 
 
 class DownloadItem:
-    def __init__(self, download_task: downloader.IDownloader) -> None:
-        self.download_id = uuid.uuid4().hex
+    def __init__(
+        self, download_task: downloader.IDownloader, download_id: str | None = None
+    ) -> None:
+        self.download_id = uuid.uuid4().hex if download_id is None else download_id
         self.download_task = download_task
 
     async def get_download_state(self) -> downloadstates.DownloadInfoState:
