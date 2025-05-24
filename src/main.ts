@@ -7,21 +7,32 @@ import { dialog } from 'electron';
 import { spawn } from 'node:child_process';
 import { ChildProcess } from "node:child_process"
 import treeKill from 'tree-kill';
-import uuid from "uuid";
+import * as uuid from "uuid";
+import fetch from "node-fetch"
+import { DefaultRequestOpts } from "./code/DownloadFromServer"
 if (started) {
 	app.quit();
 }
 let backendProcess: ChildProcess | null = null;
 let uuidOfBackend: string | null = null
-function cleanup_backend() {
-	if (backendProcess !== null) {
-		if (backendProcess.pid !== undefined) {
-			treeKill(backendProcess.pid)
-		}
-		backendProcess.kill()
+async function cleanup_backend() {
+	//Shut the server down
+	await fetch("http://localhost:8000/shutdown", { method: "POST", headers: { ...DefaultRequestOpts.headers, "x-session-token": uuidOfBackend! } })
+	console.log("Shut down the server")
+	if (backendProcess?.pid) {
+		console.log(`Killing backend PID: ${backendProcess.pid}`);
+		treeKill(backendProcess.pid, (err) => {
+			if (err) console.error('treeKill error:', err);
+			else console.log('treeKill success');
+		});
 	}
-	backendProcess = null
+	else {
+		backendProcess?.kill()
+	}
+	backendProcess = null;
 }
+
+
 const createWindow = () => {
 	// Create the browser window.
 	const mainWindow = new BrowserWindow({
@@ -47,9 +58,14 @@ const createWindow = () => {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.on('ready', () => {
-	const backendBinPath = path.join(process.resourcesPath, "server")
+	uuidOfBackend = uuid.v4()
 	if (!isDev) {
-		backendProcess = spawn(backendBinPath)
+		const backendBinPath = path.join(process.resourcesPath, "server")
+		backendProcess = spawn(backendBinPath, [uuidOfBackend])
+	}
+	else {
+		backendProcess = spawn("python", ["src/backend/start-backend.py", uuidOfBackend], { stdio: "inherit" })
+		console.log("Started backend")
 	}
 	createWindow();
 });
@@ -106,4 +122,7 @@ ipcMain.handle("getMiscJson", async (_) => {
 		return null;
 	}
 	return JSON.parse(readJson);
+})
+ipcMain.handle("getUuid", (_) => {
+	return uuidOfBackend
 })

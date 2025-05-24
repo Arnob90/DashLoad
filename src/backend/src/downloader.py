@@ -116,7 +116,7 @@ class PypdlDownloader(IDownloader):
         if not self.paused or self.cancelled:
             main_logger.info("Download is not paused, or cancelled entirely")
             return
-        self._downloader.start()
+        self._start()
         self.paused = False
 
     def pause_download(self) -> None:
@@ -167,7 +167,8 @@ class PypdlDownloader(IDownloader):
         self.cancelled = True
 
     def _start(self):
-        self._downloader.start(*self.download_start_args, **self.download_start_kwargs)
+        self._downloader.start(*self.download_start_args,
+                               **self.download_start_kwargs)
 
     async def delete_download_task(self, delete_on_disk: bool = False) -> None:
         if not self.finished():

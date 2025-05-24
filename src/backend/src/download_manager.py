@@ -12,7 +12,7 @@ main_logger = logging.getLogger(__name__)
 
 
 class DownloadManager:
-    def __init__(self, secret: ISecretHolder):
+    def __init__(self):
         self.download_items: dict[str, downloaditem.DownloadItem] = {}
 
     async def add_download_item(self, download_item: downloaditem.DownloadItem) -> str:
