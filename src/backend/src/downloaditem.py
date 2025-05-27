@@ -3,6 +3,7 @@ from typing import Optional
 import downloadstates
 import uuid
 import downloader
+import dataclasses
 
 
 class DownloadItem:
@@ -10,7 +11,7 @@ class DownloadItem:
         self, download_task: downloader.IDownloader, download_id: str | None = None
     ) -> None:
         self.download_id = uuid.uuid4().hex if download_id is None else download_id
-        self.download_task = download_task
+        self.download_task: downloader.IDownloader = download_task
 
     async def get_download_state(self) -> downloadstates.DownloadInfoState:
         filepath = await self.download_task.get_filepath()

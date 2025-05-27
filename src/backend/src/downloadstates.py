@@ -1,7 +1,8 @@
 from dataclasses import dataclass
-from pydantic import BaseModel
+import typing
+from pydantic import BaseModel, Discriminator, Field, TypeAdapter
 import abc
-from typing import Union
+from typing import Annotated, Literal, Union
 
 
 @dataclass(frozen=True)
@@ -21,37 +22,53 @@ class DownloadInfoState(BaseModel, abc.ABC):
     filename: str | None
     filepath: str
     filesize: int | None
-    type: str
     last_url: str
 
 
 class DownloadingInfo(DownloadInfoState):
     downloaded_file_portion: int | None
-    type: str = "DownloadingInfo"
+    type: Literal["DownloadingInfo"] = "DownloadingInfo"
     download_speed: float | None
 
 
 class PausedDownloadInfo(DownloadInfoState):
     downloaded_file_portion: int | None
-    type: str = "PausedDownloadInfo"
+    type: Literal["PausedDownloadInfo"] = "PausedDownloadInfo"
 
 
 class FailedDownloadInfo(DownloadInfoState):
-    type: str = "FailedDownloadInfo"
+    type: Literal["FailedDownloadInfo"] = "FailedDownloadInfo"
 
 
 class SucceededDownloadInfo(DownloadInfoState):
-    type: str = "SucceededDownloadInfo"
+    type: Literal["SucceededDownloadInfo"] = "SucceededDownloadInfo"
 
 
 class CancelledDownloadInfo(DownloadInfoState):
-    type: str = "CancelledDownloadInfo"
+    type: Literal["CancelledDownloadInfo"] = "CancelledDownloadInfo"
 
 
-DownloadStateVariants = Union[
-    DownloadingInfo,
-    PausedDownloadInfo,
-    FailedDownloadInfo,
-    SucceededDownloadInfo,
-    CancelledDownloadInfo,
+DownloadStateVariants = Annotated[
+    Union[
+        DownloadingInfo,
+        PausedDownloadInfo,
+        FailedDownloadInfo,
+        SucceededDownloadInfo,
+        CancelledDownloadInfo,
+    ],
+    Field(discriminator="type"),
 ]
+
+variant_adapter = TypeAdapter(DownloadStateVariants)
+
+
+def convert_base_type_to_variants(
+    given_info: DownloadInfoState,
+) -> DownloadStateVariants:
+    return variant_adapter.validate_python(given_info)
+
+
+def convert_variants_to_base_type(
+    given_info: DownloadStateVariants,
+) -> DownloadInfoState:
+    return given_info

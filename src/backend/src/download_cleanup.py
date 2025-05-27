@@ -13,9 +13,6 @@ def get_download_info_json_path(download_path: pathlib.Path):
     return json_path
 
 
-# TODO: Fix cleanup
-
-
 def cleanup_download(
     download_path: pathlib.Path,
     file_deleter: IFileDeleter = FileDeleter(),

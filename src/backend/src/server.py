@@ -13,7 +13,8 @@ import argparse
 import logging
 import os
 import json
-from downloadstates import DownloadStateVariants
+import downloadinfoserializer
+from downloadstates import DownloadStateVariants, convert_base_type_to_variants
 
 main_logger = logging.getLogger(__name__)
 app = fastapi.FastAPI()
@@ -65,14 +66,6 @@ class SerializeDownloadInfoRequest(BaseModel):
 
 class DeserializeDownloadInfoRequest(BaseModel):
     filepath_to_deserialize_from: str
-
-
-DownloadStateVariants = Union[
-    downloadstates.DownloadingInfo,
-    downloadstates.PausedDownloadInfo,
-    downloadstates.FailedDownloadInfo,
-    downloadstates.SucceededDownloadInfo,
-]
 
 
 @app.get(
@@ -156,9 +149,24 @@ async def serialize_downloads(
     x_session_token: Annotated[str, fastapi.Header()],
 ):
     assert SecretHolderSingleton.verify_secret(x_session_token)
-    serialized_infos = await dl_manager.serialize_download_infos()
-    with open(request.filepath_to_serialize_to, "w") as f:
-        json.dump(serialized_infos, f)
+    to_serialize_to = request.filepath_to_serialize_to
+    all_infos = await dl_manager.get_all_download_infos()
+    all_infos_converted_to_variants: dict[
+        str, downloadstates.DownloadStateVariants
+    ] = {}
+    for info in all_infos:
+        if info.download_id is None:
+            raise extras.DownloadIdMissingError("Download id is None")
+        all_infos_converted_to_variants[info.download_id] = (
+            convert_base_type_to_variants(info)
+        )
+
+        downloadinfoserializer.DownloadInfoSerializerAndDeserializer.serialize_to_path(
+            to_serialize=downloadinfoserializer.DirectSerializedInfoFormat(
+                download_infos=all_infos_converted_to_variants
+            ),
+            json_path=pathlib.Path(to_serialize_to),
+        )
 
 
 @app.post("/download/deserialize")
@@ -167,8 +175,7 @@ async def deserialize_downloads(
     x_session_token: Annotated[str, fastapi.Header()],
 ):
     assert SecretHolderSingleton.verify_secret(x_session_token)
-    with open(request.filepath_to_deserialize_from, "r") as f:
-        serialized_infos = json.load(f)
+    # TODO: Finish deserialization of downloads
 
 
 @app.post("/shutdown")

@@ -1,3 +1,4 @@
+from argparse import ArgumentError
 from os import path
 import pathlib
 from typing import Coroutine, List
@@ -6,7 +7,12 @@ from downloader import PypdlDownloader
 import downloaditem
 import asyncio
 import downloadstates
-from extras import DownloadToAnExistingPathError, ISecretHolder, SecretHolder
+from extras import (
+    DownloadIdMissingError,
+    DownloadToAnExistingPathError,
+    ISecretHolder,
+    SecretHolder,
+)
 import logging
 from pydantic import BaseModel
 import extras
@@ -21,6 +27,10 @@ class SerializedDownloadItems(BaseModel):
 class DownloadManager:
     def __init__(self):
         self.download_items: dict[str, downloaditem.DownloadItem] = {}
+        self.failed_or_cancelled_download_items: dict[
+            str,
+            downloadstates.FailedDownloadInfo | downloadstates.CancelledDownloadInfo,
+        ] = {}
 
     async def add_download_item(self, download_item: downloaditem.DownloadItem) -> str:
         id_to_filepaths = await self.get_id_to_filepaths()
@@ -61,38 +71,38 @@ class DownloadManager:
     async def get_download_info_by_id(
         self, download_id: str
     ) -> downloadstates.DownloadInfoState:
-        return await self.download_items[download_id].get_download_state()
+        if download_id in self.failed_or_cancelled_download_items:
+            return self.failed_or_cancelled_download_items[download_id]
+        state = await self.download_items[download_id].get_download_state()
+        if isinstance(state, downloadstates.FailedDownloadInfo) or isinstance(
+            state, downloadstates.CancelledDownloadInfo
+        ):
+            # Lazily populate the terminal download states
+            self.failed_or_cancelled_download_items[download_id] = state
+            self.download_items.pop(download_id)
+        return state
 
     async def get_all_download_infos(self) -> list[downloadstates.DownloadInfoState]:
         download_state_futures: list[
             Coroutine[Any, Any, downloadstates.DownloadInfoState]
         ] = []
-        for download_item in self.download_items.values():
-            download_state_futures.append(download_item.get_download_state())
+        for download_id in self.download_items:
+            download_state_futures.append(self.get_download_info_by_id(download_id))
         return await asyncio.gather(*download_state_futures)
 
-    async def serialize_download_infos(
+    async def get_all_id_to_download_infos(
         self,
-    ) -> SerializedDownloadItems:
-        result_dict: dict[str, downloadstates.DownloadInfoState] = {}
-        download_infos = await self.get_all_download_infos()
-        for download_info in download_infos:
-            if download_info.download_id is None:
-                raise extras.DownloadIdMissingError()
-            result_dict[download_info.download_id] = download_info
-        return SerializedDownloadItems(download_items=result_dict)
-
-    async def deserialize_from_download_infos(
-        self, download_infos: dict[str, downloadstates.DownloadInfoState]
-    ):
-        for download_id, download_info in download_infos.items():
-            if download_info.download_id is None:
-                raise extras.DownloadIdMissingError()
-            await self.add_download_item(
-                downloaditem.DownloadItem(
-                    PypdlDownloader(
-                        download_info.last_url, pathlib.Path(download_info.filepath)
-                    ),
-                    download_id,
-                )
-            )
+    ) -> dict[str, downloadstates.DownloadInfoState]:
+        download_state_futures: list[
+            Coroutine[Any, Any, downloadstates.DownloadInfoState]
+        ] = []
+        required_infos: list[downloadstates.DownloadInfoState] = []
+        for download_id in self.download_items:
+            download_state_futures.append(self.get_download_info_by_id(download_id))
+        required_infos = await asyncio.gather(*download_state_futures)
+        required_dict: dict[str, downloadstates.DownloadInfoState] = {}
+        for info in required_infos:
+            if info.download_id is None:
+                raise DownloadIdMissingError("Download id is None")
+            required_dict[info.download_id] = info
+        return required_dict
