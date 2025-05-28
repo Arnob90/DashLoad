@@ -8,12 +8,14 @@ import pytest
 from requests import Response
 import time
 import pathlib
+import extras
 
 main_logger = logging.getLogger(__name__)
 client = TestClient(app, raise_server_exceptions=True)
 main_logger.setLevel(logging.DEBUG)
 
-path_to_test_downloads = pathlib.Path(__file__).parent.parent / "test_download_path"
+path_to_test_downloads = pathlib.Path(
+    __file__).parent.parent / "test_download_path"
 headers = {"x-session-token": "fake key"}
 
 
@@ -35,10 +37,12 @@ def test_download_and_pause():
     _ = DownloadingInfo.model_validate(current_info.json())
     res = client.post(f"/download/pause/{res_body.id}", headers=headers)
     paused_info = client.get(f"/download/{res_body.id}", headers=headers)
+    paused_info_again = client.get(f"/download/{res_body.id}", headers=headers)
+    assert paused_info_again.status_code == 200
     paused_info_json = paused_info.json()
     main_logger.info(paused_info_json)
-    _ = PausedDownloadInfo.model_validate(paused_info.json())
-    main_logger.info(paused_info_json)
+    _ = PausedDownloadInfo.model_validate(paused_info_json)
+    _ = PausedDownloadInfo.model_validate(paused_info_again.json())
     client.post(
         f"/download/delete/{res_body.id}",
         json={"delete_on_disk": True},

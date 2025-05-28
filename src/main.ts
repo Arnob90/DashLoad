@@ -10,13 +10,27 @@ import treeKill from 'tree-kill';
 import * as uuid from "uuid";
 import fetch from "node-fetch"
 import { DefaultRequestOpts } from "./code/DownloadFromServer"
+import { DeserializeRequest, SerializeRequest } from "./code/SerializeRequests"
 if (started) {
 	app.quit();
 }
 let backendProcess: ChildProcess | null = null;
 let uuidOfBackend: string | null = null
+const serialize_path = path.join(app.getPath("userData"), "downloads_data.json")
+async function waitForBackendReady(retries = 20, delayMs = 250): Promise<void> {
+	for (let i = 0; i < retries; i++) {
+		try {
+			const res = await fetch("http://localhost:8000/ping");
+			if (res.ok) return;
+		} catch (_) {
+			// Ignore ECONNREFUSED
+		}
+		await new Promise(res => setTimeout(res, delayMs));
+	}
+	throw new Error("Backend server did not become ready in time.");
+}
 async function cleanup_backend() {
-	//Shut the server down
+	await fetch("http://localhost:8000/download/serialize", { method: "POST", headers: { ...DefaultRequestOpts.headers, "x-session-token": uuidOfBackend! }, body: JSON.stringify({ filepath_to_serialize_to: serialize_path } as SerializeRequest) })
 	await fetch("http://localhost:8000/shutdown", { method: "POST", headers: { ...DefaultRequestOpts.headers, "x-session-token": uuidOfBackend! } })
 	console.log("Shut down the server")
 	if (backendProcess?.pid) {
@@ -57,7 +71,7 @@ const createWindow = () => {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.on('ready', () => {
+app.on('ready', async () => {
 	uuidOfBackend = uuid.v4()
 	if (!isDev) {
 		const backendBinPath = path.join(process.resourcesPath, "server")
@@ -67,6 +81,21 @@ app.on('ready', () => {
 		backendProcess = spawn("python", ["src/backend/start-backend.py", uuidOfBackend], { stdio: "inherit" })
 		console.log("Started backend")
 	}
+	backendProcess.on("spawn", async () => {
+		try {
+			await waitForBackendReady()
+			await fetch("http://localhost:8000/download/deserialize",
+				{
+					method: "POST",
+					headers: { ...DefaultRequestOpts.headers, "x-session-token": uuidOfBackend! },
+					body: JSON.stringify({ filepath_to_deserialize_from: serialize_path } as DeserializeRequest)
+				})
+			console.log("Deserialized")
+		}
+		catch (err) {
+			console.log(err)
+		}
+	})
 	createWindow();
 });
 

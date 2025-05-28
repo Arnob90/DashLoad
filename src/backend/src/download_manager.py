@@ -51,7 +51,13 @@ class DownloadManager:
             main_logger.info("Deleting download info")
             del self.download_items[download_item.download_id]
 
+        def on_retry():
+            main_logger.info("Retrying download")
+            self.download_items[download_item.download_id] = download_item
+            del self.failed_or_cancelled_download_items[download_item.download_id]
+
         download_item.download_task.connect_delete_request_notify_callable(on_delete)
+        download_item.download_task.connect_retry_request_notify_callable(on_retry)
 
         return download_item.download_id
 

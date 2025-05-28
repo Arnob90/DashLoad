@@ -1,3 +1,4 @@
+import download_manager_factory
 import fastapi
 from pydantic import BaseModel
 import downloaditem
@@ -68,6 +69,11 @@ class DeserializeDownloadInfoRequest(BaseModel):
     filepath_to_deserialize_from: str
 
 
+@app.get("/ping")
+async def ping():
+    return {"ping": "pong"}
+
+
 @app.get(
     "/download/",
     response_model=list[DownloadStateVariants],
@@ -86,11 +92,13 @@ async def post_request(
     try:
         id = await dl_manager.add_download_item(
             downloaditem.DownloadItem(
-                downloader.PypdlDownloader(request.url, pathlib.Path(request.filepath)),
+                downloader.PypdlDownloader(
+                    request.url, pathlib.Path(request.filepath)),
             ),
         )
     except extras.InvalidDownloadUrlError:
-        raise fastapi.HTTPException(status_code=404, detail="The given url is invalid")
+        raise fastapi.HTTPException(
+            status_code=404, detail="The given url is invalid")
     except extras.DownloadToAnExistingPathError as err:
         raise fastapi.HTTPException(status_code=409, detail=str(err))
     return DownloadStartResponse(id=id)
@@ -143,30 +151,23 @@ async def delete_download(
     )
 
 
+@app.post("/download/retry/{id}")
+async def retry_download(id: str, x_session_token: Annotated[str, fastapi.Header()]):
+    assert SecretHolderSingleton.verify_secret(x_session_token)
+    dl_manager.get_download_item(id).download_task.retry_download()
+
+
 @app.post("/download/serialize")
 async def serialize_downloads(
     request: SerializeDownloadInfoRequest,
     x_session_token: Annotated[str, fastapi.Header()],
 ):
     assert SecretHolderSingleton.verify_secret(x_session_token)
-    to_serialize_to = request.filepath_to_serialize_to
-    all_infos = await dl_manager.get_all_download_infos()
-    all_infos_converted_to_variants: dict[
-        str, downloadstates.DownloadStateVariants
-    ] = {}
-    for info in all_infos:
-        if info.download_id is None:
-            raise extras.DownloadIdMissingError("Download id is None")
-        all_infos_converted_to_variants[info.download_id] = (
-            convert_base_type_to_variants(info)
-        )
-
-        downloadinfoserializer.DownloadInfoSerializerAndDeserializer.serialize_to_path(
-            to_serialize=downloadinfoserializer.DirectSerializedInfoFormat(
-                download_infos=all_infos_converted_to_variants
-            ),
-            json_path=pathlib.Path(to_serialize_to),
-        )
+    json_str = await download_manager_factory.DownloadManagerFactory.serialize_to_json(
+        dl_manager
+    )
+    json_path = pathlib.Path(request.filepath_to_serialize_to)
+    json_path.write_text(json_str)
 
 
 @app.post("/download/deserialize")
@@ -174,8 +175,20 @@ async def deserialize_downloads(
     request: DeserializeDownloadInfoRequest,
     x_session_token: Annotated[str, fastapi.Header()],
 ):
-    assert SecretHolderSingleton.verify_secret(x_session_token)
-    # TODO: Finish deserialization of downloads
+    if not SecretHolderSingleton.verify_secret(x_session_token):
+        raise fastapi.HTTPException(status_code=401, detail="Unauthorized")
+    json_path = pathlib.Path(request.filepath_to_deserialize_from)
+    if not json_path.exists():
+        # Nothing to serialize
+        return
+    json_str = json_path.read_text()
+    required_manager = (
+        await download_manager_factory.DownloadManagerFactory.deserialize_from_json(
+            json_str
+        )
+    )
+    global dl_manager
+    dl_manager = required_manager
 
 
 @app.post("/shutdown")
@@ -191,7 +204,6 @@ if __name__ == "__main__":
         prog="dashload-backend", description="Backend for the dashload download manager"
     )
     parser.add_argument("secret_key")
-    parser.add_argument("serialize_downloads_path")
     args = parser.parse_args()
     secret_key = args.secret_key
     SecretHolderSingleton.set_holder(extras.SecretHolder(secret_key))

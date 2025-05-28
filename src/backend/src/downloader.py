@@ -74,7 +74,17 @@ class IDownloader(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def connect_retry_request_notify_callable(
+        self, notify_callable: Callable[[], None]
+    ) -> None:
+        pass
+
+    @abc.abstractmethod
     async def delete_download_task(self, delete_on_disk: bool = False) -> None:
+        pass
+
+    @abc.abstractmethod
+    def retry_download(self) -> None:
         pass
 
 
@@ -103,11 +113,17 @@ class PypdlDownloader(IDownloader):
         self.paused = False
         self.cancelled = False
         self.delete_request_notify_callable = Hook()
+        self.retry_request_notify_signal = Hook()
 
     def connect_delete_request_notify_callable(
         self, notify_callable: Callable[[], None]
     ) -> None:
         self.delete_request_notify_callable.connect_with(notify_callable)
+
+    def connect_retry_request_notify_callable(
+        self, notify_callable: Callable[[], None]
+    ) -> None:
+        self.retry_request_notify_signal.connect_with(notify_callable)
 
     def get_is_paused(self) -> bool:
         return self.paused
@@ -118,6 +134,14 @@ class PypdlDownloader(IDownloader):
             return
         self._start()
         self.paused = False
+
+    def retry_download(self) -> None:
+        if not self.is_cancelled() or not self.failed():
+            main_logger.info("Download is not cancelled or failed")
+            return
+        self._start()
+        self.retry_request_notify_signal()
+        self.cancelled = False
 
     def pause_download(self) -> None:
         if self.paused:
@@ -167,6 +191,7 @@ class PypdlDownloader(IDownloader):
         self.cancelled = True
 
     def _start(self):
+        self._downloader = pypdl.Pypdl()
         self._downloader.start(*self.download_start_args,
                                **self.download_start_kwargs)
 
@@ -175,9 +200,9 @@ class PypdlDownloader(IDownloader):
             # If we are not done, we make sure to clean up, since we don't manage it anymore
             # After all, resource aquisition is initialization
             await self.cancel_download()
-        if self.finished and delete_on_disk:
+        if self.finished() and delete_on_disk:
             recieved_filepath = await self.get_filepath()
-            print("Recieved filepath: ", recieved_filepath)
+            main_logger.info(f"Recieved filepath: {recieved_filepath}")
             cleanup_download(recieved_filepath)
         self.delete_request_notify_callable()
 

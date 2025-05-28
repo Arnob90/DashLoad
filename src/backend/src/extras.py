@@ -1,7 +1,9 @@
 import abc
 import logging
+import os
 import requests
 import pathlib
+import debugpy
 
 
 main_logger = logging.getLogger(__name__)
@@ -33,6 +35,12 @@ def is_valid_download_url(url: str, timeout: float = 5.0) -> bool:
         return response.status_code == 200
     except requests.RequestException:
         return False
+
+
+def start_debug():
+    print(f"PID: {os.getpid()}")
+    debugpy.listen(("0.0.0.0", 5678))
+    debugpy.breakpoint()
 
 
 class ISecretHolder(abc.ABC):

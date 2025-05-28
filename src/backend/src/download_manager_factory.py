@@ -29,6 +29,7 @@ class DownloadManagerFactory:
                     download_id=id,
                 )
             )
+        return required_manager
 
     @staticmethod
     async def serialize_to_json(
