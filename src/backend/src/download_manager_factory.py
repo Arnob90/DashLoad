@@ -16,10 +16,12 @@ class DownloadManagerFactory:
         deserialized_infos = deserialized_infos_dto.download_infos
         required_manager = download_manager.DownloadManager()
         for id, info in deserialized_infos.items():
-            if isinstance(info, downloadstates.FailedDownloadInfo) or isinstance(
-                info, downloadstates.CancelledDownloadInfo
+            if (
+                isinstance(info, downloadstates.FailedDownloadInfo)
+                or isinstance(info, downloadstates.CancelledDownloadInfo)
+                or isinstance(info, downloadstates.PausedDownloadInfo)
             ):
-                required_manager.failed_or_cancelled_download_items[id] = info
+                required_manager.terminal_download_items[id] = info
                 continue
             await required_manager.add_download_item(
                 downloaditem.DownloadItem(

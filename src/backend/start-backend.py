@@ -39,8 +39,6 @@ def main():
 
     # But using `python -m uvicorn` ensures it's the one installed in your venv:
     cmd: list[str] = [str(python_exe), str(app_dir), *sys.argv[1:]]
-
-    print(f"🚀 Running: {' '.join(cmd)}")
     subprocess.run(cmd, stdout=sys.stdout, stderr=sys.stderr)
     # Restore original working directory
     os.chdir(original_cwd)

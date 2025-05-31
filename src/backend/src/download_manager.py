@@ -27,9 +27,11 @@ class SerializedDownloadItems(BaseModel):
 class DownloadManager:
     def __init__(self):
         self.download_items: dict[str, downloaditem.DownloadItem] = {}
-        self.failed_or_cancelled_download_items: dict[
+        self.terminal_download_items: dict[
             str,
-            downloadstates.FailedDownloadInfo | downloadstates.CancelledDownloadInfo,
+            downloadstates.FailedDownloadInfo
+            | downloadstates.CancelledDownloadInfo
+            | downloadstates.PausedDownloadInfo,
         ] = {}
 
     async def add_download_item(self, download_item: downloaditem.DownloadItem) -> str:
@@ -38,11 +40,13 @@ class DownloadManager:
         for id, filepath in id_to_filepaths:
             if filepath == filepath_to_download_to:
                 raise DownloadToAnExistingPathError(
-                    f"File with this name is already being downloaded. Download id:{id}"
+                    f"File with this name is already being downloaded. Download id:{
+                        id}"
                 )
         if filepath_to_download_to.exists():
             raise DownloadToAnExistingPathError(
-                f"A file already exists on disk at path {filepath_to_download_to}"
+                f"A file already exists on disk at path {
+                    filepath_to_download_to}"
             )
         self.download_items[download_item.download_id] = download_item
         download_item.download_task._start()
@@ -54,15 +58,21 @@ class DownloadManager:
         def on_retry():
             main_logger.info("Retrying download")
             self.download_items[download_item.download_id] = download_item
-            del self.failed_or_cancelled_download_items[download_item.download_id]
+            del self.terminal_download_items[download_item.download_id]
 
-        download_item.download_task.connect_delete_request_notify_callable(on_delete)
-        download_item.download_task.connect_retry_request_notify_callable(on_retry)
+        download_item.download_task.connect_delete_request_notify_callable(
+            on_delete)
+        download_item.download_task.connect_retry_request_notify_callable(
+            on_retry)
 
         return download_item.download_id
 
-    def get_download_item(self, download_id: str) -> downloaditem.DownloadItem:
-        return self.download_items[download_id]
+    async def get_download_item(self, download_id: str) -> downloaditem.DownloadItem:
+        info = await self.get_download_info_by_id(download_id)
+        if info.download_id is None:
+            raise DownloadIdMissingError("Download id is None")
+        # TODO: FIX THIS LINE. THIS FAILS IF THE DOWNLOAD IS TERMINAL
+        return self.download_items[info.download_id]
 
     async def get_id_to_filepaths(self) -> List[tuple[str, pathlib.Path]]:
         ids: List[str] = []
@@ -77,14 +87,16 @@ class DownloadManager:
     async def get_download_info_by_id(
         self, download_id: str
     ) -> downloadstates.DownloadInfoState:
-        if download_id in self.failed_or_cancelled_download_items:
-            return self.failed_or_cancelled_download_items[download_id]
+        if download_id in self.terminal_download_items:
+            return self.terminal_download_items[download_id]
         state = await self.download_items[download_id].get_download_state()
-        if isinstance(state, downloadstates.FailedDownloadInfo) or isinstance(
-            state, downloadstates.CancelledDownloadInfo
+        if (
+            isinstance(state, downloadstates.FailedDownloadInfo)
+            or isinstance(state, downloadstates.CancelledDownloadInfo)
+            or isinstance(state, downloadstates.PausedDownloadInfo)
         ):
             # Lazily populate the terminal download states
-            self.failed_or_cancelled_download_items[download_id] = state
+            self.terminal_download_items[download_id] = state
             self.download_items.pop(download_id)
         return state
 
@@ -92,8 +104,12 @@ class DownloadManager:
         download_state_futures: list[
             Coroutine[Any, Any, downloadstates.DownloadInfoState]
         ] = []
-        for download_id in self.download_items:
-            download_state_futures.append(self.get_download_info_by_id(download_id))
+        download_item_ids = list(self.download_items.keys())
+        terminal_items_ids = list(self.terminal_download_items.keys())
+        all_ids = download_item_ids + terminal_items_ids
+        for download_id in all_ids:
+            download_state_futures.append(
+                self.get_download_info_by_id(download_id))
         return await asyncio.gather(*download_state_futures)
 
     async def get_all_id_to_download_infos(
@@ -104,7 +120,8 @@ class DownloadManager:
         ] = []
         required_infos: list[downloadstates.DownloadInfoState] = []
         for download_id in self.download_items:
-            download_state_futures.append(self.get_download_info_by_id(download_id))
+            download_state_futures.append(
+                self.get_download_info_by_id(download_id))
         required_infos = await asyncio.gather(*download_state_futures)
         required_dict: dict[str, downloadstates.DownloadInfoState] = {}
         for info in required_infos:
@@ -112,3 +129,13 @@ class DownloadManager:
                 raise DownloadIdMissingError("Download id is None")
             required_dict[info.download_id] = info
         return required_dict
+
+    async def shutdown(self):
+        """
+        Stops all downloads and prepares for shutdown. The download manager will not be usable after this, so do not use.
+        DO NOT SERIALIZE AFTER SHUTDOWN. ALL STATES WILL BECOME PAUSED AND THUS STALE
+        """
+        for download_item in self.download_items.values():
+            state_of_download = await download_item.get_download_state()
+            if isinstance(state_of_download, downloadstates.DownloadingInfo):
+                download_item.download_task.pause_download()
