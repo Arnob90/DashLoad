@@ -3,19 +3,15 @@ import fastapi
 from pydantic import BaseModel
 import downloaditem
 import download_manager
-import downloadstates
 import extras
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Annotated, Union
+from typing import Annotated
 import uvicorn
 import downloader
 import pathlib
 import argparse
 import logging
-import os
-import json
-import downloadinfoserializer
-from downloadstates import DownloadStateVariants, convert_base_type_to_variants
+from downloadstates import DownloadStateVariants
 
 main_logger = logging.getLogger(__name__)
 app = fastapi.FastAPI()
@@ -93,13 +89,11 @@ async def post_request(
     try:
         id = await dl_manager.add_download_item(
             downloaditem.DownloadItem(
-                downloader.PypdlDownloader(
-                    request.url, pathlib.Path(request.filepath)),
+                downloader.PypdlDownloader(request.url, pathlib.Path(request.filepath)),
             ),
         )
     except extras.InvalidDownloadUrlError:
-        raise fastapi.HTTPException(
-            status_code=404, detail="The given url is invalid")
+        raise fastapi.HTTPException(status_code=404, detail="The given url is invalid")
     except extras.DownloadToAnExistingPathError as err:
         raise fastapi.HTTPException(status_code=409, detail=str(err))
     return DownloadStartResponse(id=id)
@@ -121,7 +115,7 @@ async def get_by_id(id: str, x_session_token: Annotated[str, fastapi.Header()]):
 async def pause_download(id: str, x_session_token: Annotated[str, fastapi.Header()]):
     assert SecretHolderSingleton.verify_secret(x_session_token)
     try:
-        (await dl_manager.get_download_item(id)).download_task.pause_download()
+        dl_manager.pause_download(id)
     except ValueError:
         raise fastapi.HTTPException(
             status_code=404, detail="The required download does not exist"
@@ -131,13 +125,13 @@ async def pause_download(id: str, x_session_token: Annotated[str, fastapi.Header
 @app.post("/download/stop/{id}")
 async def stop_download(id: str, x_session_token: Annotated[str, fastapi.Header()]):
     assert SecretHolderSingleton.verify_secret(x_session_token)
-    await (await dl_manager.get_download_item(id)).download_task.cancel_download()
+    await dl_manager.cancel_download(id)
 
 
 @app.post("/download/resume/{id}")
 async def resume_download(id: str, x_session_token: Annotated[str, fastapi.Header()]):
     assert SecretHolderSingleton.verify_secret(x_session_token)
-    (await dl_manager.get_download_item(id)).download_task.resume_download()
+    await dl_manager.resume_download(id)
 
 
 @app.post("/download/delete/{id}")
@@ -146,16 +140,13 @@ async def delete_download(
 ):
     assert SecretHolderSingleton.verify_secret(x_session_token)
     delete_from_file = request.delete_on_disk
-    logging.info(f"Delete request with local delete {delete_from_file}")
-    await (await dl_manager.get_download_item(id)).download_task.delete_download_task(
-        delete_from_file
-    )
+    await dl_manager.delete_download_task(id, delete_from_file)
 
 
 @app.post("/download/retry/{id}")
 async def retry_download(id: str, x_session_token: Annotated[str, fastapi.Header()]):
     assert SecretHolderSingleton.verify_secret(x_session_token)
-    (await dl_manager.get_download_item(id)).download_task.retry_download()
+    await dl_manager.retry_download(id)
 
 
 @app.post("/download/serialize")
@@ -192,13 +183,15 @@ async def deserialize_downloads(
     dl_manager = required_manager
 
 
-@app.post("/shutdown")
+@app.post("/download/shutdown")
 async def shutdown(x_session_token: Annotated[str, fastapi.Header()]):
     assert SecretHolderSingleton.verify_secret(x_session_token)
-    print("Shutting down from uvicorn")
+    main_logger.info("Shutting down from uvicorn")
     if server:
         await dl_manager.shutdown()
         server.should_exit = True
+    else:
+        raise fastapi.HTTPException(status_code=500, detail="The server is not running")
 
 
 logging.info("Logging is working")

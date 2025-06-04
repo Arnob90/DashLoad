@@ -37,24 +37,23 @@ async function cleanup_backend() {
 		console.log("Starting shutdown")
 		await fetch("http://localhost:8000/download/serialize", { method: "POST", headers: { ...DefaultRequestOpts.headers, "x-session-token": uuidOfBackend! }, body: JSON.stringify({ filepath_to_serialize_to: serialize_path } as SerializeRequest) })
 		console.log("Serialization complete")
-		await fetch("http://localhost:8000/shutdown", { method: "POST", headers: { ...DefaultRequestOpts.headers, "x-session-token": uuidOfBackend! } })
+		await fetch("http://localhost:8000/download/shutdown", { method: "POST", headers: { ...DefaultRequestOpts.headers, "x-session-token": uuidOfBackend! } })
 		console.log("Shut down the server")
 	}
 	catch (err) {
 		console.error(err)
 	}
 	finally {
-
-		if (backendProcess?.pid) {
-			console.log(`Killing backend PID: ${backendProcess.pid}`);
-			treeKill(backendProcess.pid, (err) => {
-				if (err) console.error('treeKill error:', err);
-				else console.log('treeKill success');
-			});
-		}
-		else {
-			backendProcess?.kill()
-		}
+		// if (backendProcess?.pid) {
+		// 	console.log(`Killing backend PID: ${backendProcess.pid}`);
+		// 	treeKill(backendProcess.pid, (err) => {
+		// 		if (err) console.error('treeKill error:', err);
+		// 		else console.log('treeKill success');
+		// 	});
+		// }
+		// else {
+		// 	backendProcess?.kill()
+		// }
 		backendProcess = null;
 		console.log("Done shutting down!")
 	}
@@ -132,8 +131,11 @@ app.on('activate', () => {
 });
 
 
-app.on("before-quit", cleanup_backend)
-app.on("will-quit", cleanup_backend)
+app.on("will-quit", function(e) {
+	e.preventDefault()
+	cleanup_backend()
+	app.quit()
+});
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.

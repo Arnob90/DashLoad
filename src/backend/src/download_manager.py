@@ -1,5 +1,3 @@
-from argparse import ArgumentError
-from os import path
 import pathlib
 from typing import Coroutine, List
 from typing import Any
@@ -10,12 +8,10 @@ import downloadstates
 from extras import (
     DownloadIdMissingError,
     DownloadToAnExistingPathError,
-    ISecretHolder,
-    SecretHolder,
 )
 import logging
 from pydantic import BaseModel
-import extras
+import download_cleanup
 
 main_logger = logging.getLogger(__name__)
 
@@ -40,13 +36,11 @@ class DownloadManager:
         for id, filepath in id_to_filepaths:
             if filepath == filepath_to_download_to:
                 raise DownloadToAnExistingPathError(
-                    f"File with this name is already being downloaded. Download id:{
-                        id}"
+                    f"File with this name is already being downloaded. Download id:{id}"
                 )
         if filepath_to_download_to.exists():
             raise DownloadToAnExistingPathError(
-                f"A file already exists on disk at path {
-                    filepath_to_download_to}"
+                f"A file already exists on disk at path {filepath_to_download_to}"
             )
         self.download_items[download_item.download_id] = download_item
         download_item.download_task._start()
@@ -60,19 +54,92 @@ class DownloadManager:
             self.download_items[download_item.download_id] = download_item
             del self.terminal_download_items[download_item.download_id]
 
-        download_item.download_task.connect_delete_request_notify_callable(
-            on_delete)
-        download_item.download_task.connect_retry_request_notify_callable(
-            on_retry)
+        download_item.download_task.connect_delete_request_notify_callable(on_delete)
+        download_item.download_task.connect_retry_request_notify_callable(on_retry)
 
         return download_item.download_id
 
-    async def get_download_item(self, download_id: str) -> downloaditem.DownloadItem:
-        info = await self.get_download_info_by_id(download_id)
-        if info.download_id is None:
-            raise DownloadIdMissingError("Download id is None")
-        # TODO: FIX THIS LINE. THIS FAILS IF THE DOWNLOAD IS TERMINAL
-        return self.download_items[info.download_id]
+    async def resume_download(self, download_id: str):
+        if download_id in self.download_items:
+            self.download_items[download_id].download_task.resume_download()
+            return
+        if download_id in self.terminal_download_items:
+            terminal_download = await self.get_download_info_by_id(download_id)
+            await self.add_download_item(
+                downloaditem.DownloadItem(
+                    PypdlDownloader(
+                        download_url=terminal_download.last_url,
+                        filepath=pathlib.Path(terminal_download.filepath),
+                    ),
+                    download_id=terminal_download.download_id,
+                ),
+            )
+            del self.terminal_download_items[download_id]
+            return
+        else:
+            raise ValueError("The download id doesn't exist in manager")
+
+    def pause_download(self, download_id: str):
+        if download_id in self.download_items:
+            self.download_items[download_id].download_task.pause_download()
+            return
+
+        # if it's terminal, then it's not running at all!
+        if download_id in self.terminal_download_items:
+            main_logger.info("Download is already stopped")
+            return
+
+        raise ValueError("The download id doesn't exist in manager")
+
+    async def cancel_download(self, download_id: str):
+        if download_id in self.download_items:
+            await self.download_items[download_id].download_task.cancel_download()
+            # Get function will lazily populate terminal. No need to be so eager!
+            return
+
+        if download_id in self.terminal_download_items:
+            terminal_download = await self.get_download_info_by_id(download_id)
+            download_filepath = pathlib.Path(terminal_download.filepath)
+            download_cleanup.cleanup_download(download_filepath)
+            resulting_state = downloadstates.CancelledDownloadInfo(
+                download_id=download_id,
+                filepath=str(download_filepath),
+                filename=download_filepath.name,
+                filesize=terminal_download.filesize,
+                last_url=terminal_download.last_url,
+            )
+            self.terminal_download_items[download_id] = resulting_state
+            return
+
+        raise ValueError("The download id doesn't exist in manager")
+
+    async def delete_download_task(self, download_id: str, delete_file: bool):
+        if delete_file:
+            await self.cancel_download(download_id)
+        else:
+            self.pause_download(download_id)
+        if download_id in self.download_items:
+            self.download_items.pop(download_id)
+            return
+        self.terminal_download_items.pop(download_id)
+
+    async def retry_download(self, download_id: str):
+        if download_id in self.download_items:
+            self.download_items[download_id].download_task.retry_download()
+            return
+        elif download_id in self.terminal_download_items:
+            terminal_download = await self.get_download_info_by_id(download_id)
+            await self.add_download_item(
+                downloaditem.DownloadItem(
+                    PypdlDownloader(
+                        download_url=terminal_download.last_url,
+                        filepath=pathlib.Path(terminal_download.filepath),
+                    ),
+                    download_id=terminal_download.download_id,
+                ),
+            )
+            return
+        raise ValueError("The download id doesn't exist in manager")
 
     async def get_id_to_filepaths(self) -> List[tuple[str, pathlib.Path]]:
         ids: List[str] = []
@@ -106,10 +173,9 @@ class DownloadManager:
         ] = []
         download_item_ids = list(self.download_items.keys())
         terminal_items_ids = list(self.terminal_download_items.keys())
-        all_ids = download_item_ids + terminal_items_ids
+        all_ids = list(download_item_ids) + list(terminal_items_ids)
         for download_id in all_ids:
-            download_state_futures.append(
-                self.get_download_info_by_id(download_id))
+            download_state_futures.append(self.get_download_info_by_id(download_id))
         return await asyncio.gather(*download_state_futures)
 
     async def get_all_id_to_download_infos(
@@ -119,9 +185,11 @@ class DownloadManager:
             Coroutine[Any, Any, downloadstates.DownloadInfoState]
         ] = []
         required_infos: list[downloadstates.DownloadInfoState] = []
-        for download_id in self.download_items:
-            download_state_futures.append(
-                self.get_download_info_by_id(download_id))
+        all_ids = list(self.download_items.keys()) + list(
+            self.terminal_download_items.keys()
+        )
+        for download_id in all_ids:
+            download_state_futures.append(self.get_download_info_by_id(download_id))
         required_infos = await asyncio.gather(*download_state_futures)
         required_dict: dict[str, downloadstates.DownloadInfoState] = {}
         for info in required_infos:
@@ -132,7 +200,7 @@ class DownloadManager:
 
     async def shutdown(self):
         """
-        Stops all downloads and prepares for shutdown. The download manager will not be usable after this, so do not use.
+        Pause all downloads and prepares for shutdown. The download manager will not be usable after this, so do not use.
         DO NOT SERIALIZE AFTER SHUTDOWN. ALL STATES WILL BECOME PAUSED AND THUS STALE
         """
         for download_item in self.download_items.values():
