@@ -115,9 +115,8 @@ app.on('ready', async () => {
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
-app.on('window-all-closed', () => {
+app.on('window-all-closed', async () => {
 	if (process.platform !== 'darwin') {
-		cleanup_backend()
 		app.quit();
 	}
 });
@@ -130,10 +129,14 @@ app.on('activate', () => {
 	}
 });
 
-
-app.on("will-quit", function(e) {
+let quitting = false
+app.on("before-quit", async (e) => {
+	if (quitting) {
+		return
+	}
 	e.preventDefault()
-	cleanup_backend()
+	await cleanup_backend()
+	quitting = true
 	app.quit()
 });
 
