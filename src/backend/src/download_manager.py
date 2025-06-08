@@ -1,19 +1,39 @@
+from os import path
 import pathlib
-from typing import Coroutine, List
+import downloader
+import threading
+from typing import Coroutine, List, Optional
 from typing import Any
+from uuid import uuid4
+import debugpy
 from downloader import PypdlDownloader
+import extras
+import internet_connections
 import downloaditem
 import asyncio
 import downloadstates
 from extras import (
     DownloadIdMissingError,
     DownloadToAnExistingPathError,
+    InvalidDownloadUrlError,
 )
 import logging
 from pydantic import BaseModel
 import download_cleanup
 
 main_logger = logging.getLogger(__name__)
+
+
+def _get_queue_download_from_item(
+    given_item: downloaditem.DownloadItem,
+) -> downloadstates.QueuedDownloadInfo:
+    return downloadstates.QueuedDownloadInfo(
+        download_id=given_item.download_id,
+        filepath=str(given_item.download_task.get_short_filepath()),
+        last_url=given_item.download_task.get_last_url(),
+        filename=None,
+        filesize=None,
+    )
 
 
 class SerializedDownloadItems(BaseModel):
@@ -27,10 +47,79 @@ class DownloadManager:
             str,
             downloadstates.FailedDownloadInfo
             | downloadstates.CancelledDownloadInfo
-            | downloadstates.PausedDownloadInfo,
+            | downloadstates.PausedDownloadInfo
+            | downloadstates.QueuedDownloadInfo,
         ] = {}
+        self.network_tracker = internet_connections.NetworkConnectionPoller()
+
+    async def queue_download(self, queue_info: downloadstates.QueuedDownloadInfo):
+        if not extras.check_if_url_syntax_valid(queue_info.last_url):
+            raise InvalidDownloadUrlError()
+
+        if self.network_tracker.available:
+            return await self.add_download_item(
+                downloaditem.DownloadItem(
+                    PypdlDownloader(
+                        download_url=queue_info.last_url,
+                        filepath=pathlib.Path(queue_info.filepath),
+                    ),
+                    download_id=queue_info.download_id,
+                )
+            )
+        if queue_info.download_id is None:
+            raise DownloadIdMissingError("The info to queue doesn't even have an id!!!")
+        self.terminal_download_items[queue_info.download_id] = queue_info
+        # Use a list to store a pointer on the heap
+        # That way, when it is copied into the closure, the pointer is copied
+        # Not the value
+        done_running = [False]
+
+        def handle_internet_access():
+            if done_running[0]:
+                return
+            if not self.network_tracker.available:
+                return
+
+            async def async_wrapper():
+                if queue_info.download_id is None:
+                    raise DownloadIdMissingError(
+                        "The info to queue doesn't even have an id!!!"
+                    )
+                try:
+                    # Should be impossible with disciplined coding, assuming the item is not mutated
+                    # But you can never be too sure :)
+                    await self.add_download_item(
+                        downloaditem.DownloadItem(
+                            PypdlDownloader(
+                                download_url=queue_info.last_url,
+                                filepath=pathlib.Path(queue_info.filepath),
+                            ),
+                            download_id=queue_info.download_id,
+                        ),
+                    )
+                except Exception as err:
+                    main_logger.info(err)
+
+                finally:
+                    del self.terminal_download_items[queue_info.download_id]
+                    done_running[0] = True
+
+            def runner():
+                asyncio.run(async_wrapper())
+
+            threading.Thread(target=runner, daemon=True).start()
+
+        self.network_tracker.connection_status_changed_hook.connect_with(
+            handle_internet_access
+        )
+        return queue_info.download_id
 
     async def add_download_item(self, download_item: downloaditem.DownloadItem) -> str:
+        # TODO: Remove this debugging statement
+        # debugpy.listen(("localhost", 5678))
+        # print("debugpy listening on 5678", flush=True)
+        # debugpy.wait_for_client()
+        # debugpy.breakpoint()
         id_to_filepaths = await self.get_id_to_filepaths()
         filepath_to_download_to = await download_item.download_task.get_filepath()
         for id, filepath in id_to_filepaths:
@@ -165,6 +254,18 @@ class DownloadManager:
             # Lazily populate the terminal download states
             self.terminal_download_items[download_id] = state
             self.download_items.pop(download_id)
+
+        if (
+            isinstance(state, downloadstates.DownloadingInfo)
+            and not self.network_tracker.available
+        ):
+            return downloadstates.PendingDownloadInfo(
+                download_id=state.download_id,
+                filename=state.filename,
+                filepath=state.filepath,
+                filesize=state.filesize,
+                last_url=state.last_url,
+            )
         return state
 
     async def get_all_download_infos(self) -> list[downloadstates.DownloadInfoState]:
@@ -197,6 +298,33 @@ class DownloadManager:
                 raise DownloadIdMissingError("Download id is None")
             required_dict[info.download_id] = info
         return required_dict
+
+    async def add_pypdl_download(
+        self, url: str, filepath: pathlib.Path, id: str | None = None
+    ) -> str:
+        id_to_use: str = ""
+        if id is None:
+            id_to_use = uuid4().hex
+        else:
+            id_to_use = id
+
+        if not self.network_tracker.available:
+            ret_id = await self.queue_download(
+                downloadstates.QueuedDownloadInfo(
+                    download_id=id_to_use,
+                    filepath=str(filepath),
+                    filename=None,
+                    filesize=None,
+                    last_url=url,
+                )
+            )
+            return ret_id
+        ret_id = await self.add_download_item(
+            downloaditem.DownloadItem(
+                downloader.PypdlDownloader(url, filepath),
+            ),
+        )
+        return ret_id
 
     async def shutdown(self):
         """

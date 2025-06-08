@@ -1,5 +1,8 @@
+import string
+import uuid
 import download_manager_factory
 import fastapi
+from internet_connections import NetworkConnectionPoller
 from pydantic import BaseModel
 import downloaditem
 import download_manager
@@ -11,7 +14,8 @@ import downloader
 import pathlib
 import argparse
 import logging
-from downloadstates import DownloadStateVariants
+from downloadstates import DownloadStateVariants, QueuedDownloadInfo
+import debugpy
 
 main_logger = logging.getLogger(__name__)
 app = fastapi.FastAPI()
@@ -42,7 +46,7 @@ class SecretHolderSingleton:
         return cls._holder.verify_secret(token)
 
 
-dl_manager = download_manager.DownloadManager()
+dl_manager: download_manager.DownloadManager = download_manager.DownloadManager()
 
 
 class DownloadRequest(BaseModel):
@@ -66,9 +70,17 @@ class DeserializeDownloadInfoRequest(BaseModel):
     filepath_to_deserialize_from: str
 
 
+connection_tracker = NetworkConnectionPoller()
+
+
 @app.get("/ping")
 async def ping():
     return {"ping": "pong"}
+
+
+@app.get("/internet_available")
+def check_internet_availablity():
+    return connection_tracker.available
 
 
 @app.get(
@@ -86,16 +98,17 @@ async def post_request(
     request: DownloadRequest, x_session_token: Annotated[str, fastapi.Header()]
 ) -> DownloadStartResponse:
     assert SecretHolderSingleton.verify_secret(x_session_token)
+    id: str = ""
     try:
-        id = await dl_manager.add_download_item(
-            downloaditem.DownloadItem(
-                downloader.PypdlDownloader(request.url, pathlib.Path(request.filepath)),
-            ),
+        id = await dl_manager.add_pypdl_download(
+            request.url, pathlib.Path(request.filepath)
         )
     except extras.InvalidDownloadUrlError:
         raise fastapi.HTTPException(status_code=404, detail="The given url is invalid")
     except extras.DownloadToAnExistingPathError as err:
         raise fastapi.HTTPException(status_code=409, detail=str(err))
+    except Exception as err:
+        main_logger.info(err)
     return DownloadStartResponse(id=id)
 
 

@@ -1,5 +1,6 @@
 import abc
 import logging
+from os import path
 import pathlib
 from typing import Callable
 import pypdl
@@ -85,6 +86,10 @@ class IDownloader(abc.ABC):
 
     @abc.abstractmethod
     def retry_download(self) -> None:
+        pass
+
+    @abc.abstractmethod
+    def get_short_filepath(self) -> pathlib.Path:
         pass
 
 
@@ -177,6 +182,9 @@ class PypdlDownloader(IDownloader):
         gotten_filepath_converted = pathlib.Path(gotten_filepath)
         print(f"Got filepath: {gotten_filepath_converted}")
         return gotten_filepath_converted
+
+    def get_short_filepath(self) -> pathlib.Path:
+        return self.filepath
 
     def get_last_url(self) -> str:
         return self._url

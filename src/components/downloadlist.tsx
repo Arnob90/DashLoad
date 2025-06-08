@@ -10,6 +10,7 @@ import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem } 
 import clsx from "clsx"
 import { Button } from "@radix-ui/themes";
 import { useKeyHandler } from "../hooks/KeyHandler";
+import { Label } from "@/components/ui/label";
 interface DownloadTableProps {
 	downloadInfos: DownloadInfo[]
 	className?: string
@@ -34,33 +35,37 @@ export function DownloadTable({ downloadInfos, pausedOrPlayButtonPressedEventHan
 			header: 'Filename',
 			cell: (info) => {
 				const row = info.row.original;
+				let placeHolderValueIfRowEmpty: string = "Lorem Ipsum"
 				let requiredComponent: ReactNode = null;
-				switch (row.type) {
-					case "PausedDownloadInfo":
-						requiredComponent = (
-							<button onClick={() => pausedOrPlayButtonPressedEventHandler?.(row)}>
-								<PlayIcon></PlayIcon>
-							</button>
-						)
-						break
-					case "DownloadingInfo":
-						requiredComponent = (
-							<button onClick={() => pausedOrPlayButtonPressedEventHandler?.(row)}>
-								<PauseIcon></PauseIcon>
-							</button>
-						)
-						break
-					case "FailedDownloadInfo":
-						requiredComponent = (
-							<button onClick={() => retryButtonPressedEventHandler?.(row)}>
-								<RotateCcw></RotateCcw>
-							</button>
-						)
+				if (row.type == "PausedDownloadInfo") {
+					requiredComponent = (
+						<button onClick={() => pausedOrPlayButtonPressedEventHandler?.(row)}>
+							<PlayIcon></PlayIcon>
+						</button>
+					)
+				}
+				else if (row.type == "DownloadingInfo" || row.type == "PendingDownloadInfo") {
+					requiredComponent = (
+						<button onClick={() => pausedOrPlayButtonPressedEventHandler?.(row)}>
+							<PauseIcon></PauseIcon>
+						</button>
+					)
+				}
+				else if (row.type == "FailedDownloadInfo") {
+					requiredComponent = (
+						<button onClick={() => retryButtonPressedEventHandler?.(row)}>
+							<RotateCcw></RotateCcw>
+						</button>
+					)
+				}
+				else if (row.type == "QueuedDownloadInfo") {
+					requiredComponent = null
+					placeHolderValueIfRowEmpty = row.last_url
 				}
 				return (
 					<div className="flex gap-2 items-center" >
 						{requiredComponent}
-						{info.getValue()}
+						<Label className="text-ellipsis">{info.getValue() ?? placeHolderValueIfRowEmpty}</Label>
 					</div >
 				)
 			}
@@ -78,6 +83,10 @@ export function DownloadTable({ downloadInfos, pausedOrPlayButtonPressedEventHan
 						return <p>Failed</p>
 					case "SucceededDownloadInfo":
 						return <p>Succeeded</p>
+					case "QueuedDownloadInfo":
+						return <p>Waiting for internet...</p>
+					case "PendingDownloadInfo":
+						return <p>Waiting for internet...</p>
 					default:
 						return <p>-</p>
 				}
