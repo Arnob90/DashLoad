@@ -48,6 +48,14 @@ class CancelledDownloadInfo(DownloadInfoState):
     type: Literal["CancelledDownloadInfo"] = "CancelledDownloadInfo"
 
 
+class PendingDownloadInfo(DownloadInfoState):
+    type: Literal["PendingDownloadInfo"] = "PendingDownloadInfo"
+
+
+class QueuedDownloadInfo(DownloadInfoState):
+    type: Literal["QueuedDownloadInfo"] = "QueuedDownloadInfo"
+
+
 DownloadStateVariants = Annotated[
     Union[
         DownloadingInfo,
@@ -55,6 +63,8 @@ DownloadStateVariants = Annotated[
         FailedDownloadInfo,
         SucceededDownloadInfo,
         CancelledDownloadInfo,
+        QueuedDownloadInfo,
+        PendingDownloadInfo,
     ],
     Field(discriminator="type"),
 ]

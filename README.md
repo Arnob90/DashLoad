@@ -114,7 +114,7 @@ npm run start:backend
 - [x] Core download logic
 - [x] Multi-segmented downloads
 - [x] Add tests
-- [ ] Serialization and deserialization of downloads(dowloads remain even after restart, working on it currently)
+- [x] Serialization and deserialization of downloads
 - [ ] Torrenting
 - [ ] Bug free and stable
 - [ ] Performance optimization(maybe move away from electron/python)

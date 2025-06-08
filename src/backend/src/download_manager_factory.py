@@ -1,10 +1,10 @@
 import download_manager
-from downloader import PypdlDownloader
 import downloadinfoserializer
-import downloaditem
 import pathlib
-
+import logging
 import downloadstates
+
+main_logger = logging.getLogger(__name__)
 
 
 class DownloadManagerFactory:
@@ -13,6 +13,12 @@ class DownloadManagerFactory:
         deserialized_infos_dto = downloadinfoserializer.DownloadInfoSerializerAndDeserializer.deserialize_from_json(
             json_str
         )
+        # TODO: Remove debug statement
+        # import debugpy
+        #
+        # debugpy.listen(("localhost", 5678))
+        # main_logger.info("debugpy listening on 5678")
+        # debugpy.wait_for_client()
         deserialized_infos = deserialized_infos_dto.download_infos
         required_manager = download_manager.DownloadManager()
         for id, info in deserialized_infos.items():
@@ -23,13 +29,9 @@ class DownloadManagerFactory:
             ):
                 required_manager.terminal_download_items[id] = info
                 continue
-            await required_manager.add_download_item(
-                downloaditem.DownloadItem(
-                    download_task=PypdlDownloader(
-                        info.last_url, pathlib.Path(info.filepath)
-                    ),
-                    download_id=id,
-                )
+
+            await required_manager.add_pypdl_download(
+                info.last_url, pathlib.Path(info.filepath), id
             )
         return required_manager
 

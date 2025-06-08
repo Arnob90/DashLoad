@@ -44,6 +44,13 @@ const succeededDownloadInfoSchema = baseDownloadInfoSchema.extend({
 });
 
 
+const pendingDownloadInfo = baseDownloadInfoSchema.extend({
+	type: z.literal('PendingDownloadInfo'),
+});
+const queuedDownloadInfo = baseDownloadInfoSchema.extend({
+	type: z.literal('QueuedDownloadInfo')
+})
+
 // 6. Create the Discriminated Union
 // Zod uses the 'type' field to determine which schema to apply
 export const downloadInfoUnionSchema = z.discriminatedUnion('type', [
@@ -51,6 +58,8 @@ export const downloadInfoUnionSchema = z.discriminatedUnion('type', [
 	pausedDownloadInfoSchema,
 	failedDownloadInfoSchema,
 	succeededDownloadInfoSchema,
+	pendingDownloadInfo,
+	queuedDownloadInfo
 ]);
 
 // 7. Create the final schema for the API response (a list/array of the union)
@@ -67,6 +76,8 @@ export type DownloadingInfo = z.infer<typeof downloadingInfoSchema>;
 export type PausedDownloadInfo = z.infer<typeof pausedDownloadInfoSchema>;
 export type FailedDownloadInfo = z.infer<typeof failedDownloadInfoSchema>;
 export type SucceededDownloadInfo = z.infer<typeof succeededDownloadInfoSchema>;
+export type PendingDownloadInfo = z.infer<typeof pendingDownloadInfo>
+export type QueuedDownloadInfo = z.infer<typeof queuedDownloadInfo>
 
 // Type for the entire API response array
 export type DownloadsList = z.infer<typeof downloadsListSchema>;

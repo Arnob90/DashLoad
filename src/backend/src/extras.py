@@ -1,10 +1,12 @@
 import abc
 import logging
+import re
+import urllib.parse
 import os
 import requests
 import pathlib
 import debugpy
-
+import socket
 
 main_logger = logging.getLogger(__name__)
 
@@ -34,6 +36,29 @@ def is_valid_download_url(url: str, timeout: float = 5.0) -> bool:
 
         return response.status_code == 200
     except requests.RequestException:
+        return False
+
+
+def check_if_url_syntax_valid(url: str):
+    try:
+        result = urllib.parse.urlparse(url)
+        return all([result.scheme, result.netloc])
+    except ValueError:
+        return False
+
+
+def internet_present(host: str = "8.8.8.8", port=53, timeout=3.0) -> bool:
+    """
+    Host: 8.8.8.8 (google-public-dns-a.google.com)
+    OpenPort: 53/tcp
+    Service: domain (DNS/TCP)
+    """
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(timeout)
+            sock.connect((host, port))
+        return True
+    except socket.error:
         return False
 
 
@@ -111,5 +136,13 @@ class DownloadIdMissingError(Exception):
         self,
         msg="The required download doesn't even have an id. \
         How is that possible?!",
+    ) -> None:
+        super().__init__(msg)
+
+
+class InvalidUrl(Exception):
+    def __init__(
+        self,
+        msg="The given url isn't syntatically valid",
     ) -> None:
         super().__init__(msg)
