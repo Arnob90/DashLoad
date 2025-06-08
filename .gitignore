@@ -97,7 +97,6 @@ src/backend/.zed
 src/backend/libtorrent_backend/vcpkg_installed
 src/backend/src/__pycache__
 src/backend/src/dashload.egg-info
-src/backend/libtorrent_backend/vcpkg
 src/backend/src/dashload_backend.egg-info
 src/backend/test/__pycache__
 src/backend/test/integration/__pycache__
