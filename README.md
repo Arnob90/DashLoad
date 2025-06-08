@@ -82,14 +82,8 @@ These instructions will get you a copy of the project up and running on your loc
 
   ```bash
   # Using npm
-  npm run dev
+  npm run start
   ```
-
-- To only start the frontend
-
-```bash
-npm run start
-```
 
 - To only start the backend
 
