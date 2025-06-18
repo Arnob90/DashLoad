@@ -31,8 +31,6 @@
 *.out
 *.app
 
-/vcpkg
 /builds
 .DS_Store
 /build
-/vcpkg_installed

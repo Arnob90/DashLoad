@@ -105,3 +105,6 @@ src/build/server
 src/server.spec
 server.spec
 build/server
+build/.cmake/api/v1/query/client-neocmake
+src/backend/libtorrent_backend/.github/workflows
+src/backend/libtorrent_backend/img
