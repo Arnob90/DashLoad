@@ -8,6 +8,7 @@ from enum import Enum
 from hook import Hook
 from pypdl import utils
 from download_cleanup import cleanup_download
+import fastapi_exceptions
 import extras
 
 
@@ -104,7 +105,7 @@ class PypdlDownloader(IDownloader):
     ) -> None:
         self._downloader: pypdl.Pypdl = pypdl.Pypdl()
         if not extras.is_valid_download_url(download_url):
-            raise extras.InvalidDownloadUrlError()
+            raise fastapi_exceptions.InvalidDownloadUrlError()
         self._url: str = download_url
         self._cached_full_filepath: pathlib.Path | None = None
         self.filepath = filepath

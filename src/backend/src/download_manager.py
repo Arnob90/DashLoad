@@ -1,21 +1,20 @@
-from os import path
 import pathlib
 import downloader
 import threading
-from typing import Coroutine, List, Optional
+from typing import Coroutine, List
 from typing import Any
 from uuid import uuid4
-import debugpy
 from downloader import PypdlDownloader
 import extras
 import internet_connections
 import downloaditem
 import asyncio
 import downloadstates
-from extras import (
+from fastapi_exceptions import (
     DownloadIdMissingError,
     DownloadToAnExistingPathError,
     InvalidDownloadUrlError,
+    DownloadNotFoundError,
 )
 import logging
 from pydantic import BaseModel
@@ -67,7 +66,8 @@ class DownloadManager:
                 )
             )
         if queue_info.download_id is None:
-            raise DownloadIdMissingError("The info to queue doesn't even have an id!!!")
+            raise DownloadIdMissingError(
+                "The info to queue doesn't even have an id!!!")
         self.terminal_download_items[queue_info.download_id] = queue_info
         # Use a list to store a pointer on the heap
         # That way, when it is copied into the closure, the pointer is copied
@@ -115,21 +115,18 @@ class DownloadManager:
         return queue_info.download_id
 
     async def add_download_item(self, download_item: downloaditem.DownloadItem) -> str:
-        # TODO: Remove this debugging statement
-        # debugpy.listen(("localhost", 5678))
-        # print("debugpy listening on 5678", flush=True)
-        # debugpy.wait_for_client()
-        # debugpy.breakpoint()
         id_to_filepaths = await self.get_id_to_filepaths()
         filepath_to_download_to = await download_item.download_task.get_filepath()
         for id, filepath in id_to_filepaths:
             if filepath == filepath_to_download_to:
                 raise DownloadToAnExistingPathError(
-                    f"File with this name is already being downloaded. Download id:{id}"
+                    f"File with this name is already being downloaded. Download id:{
+                        id}"
                 )
         if filepath_to_download_to.exists():
             raise DownloadToAnExistingPathError(
-                f"A file already exists on disk at path {filepath_to_download_to}"
+                f"A file already exists on disk at path {
+                    filepath_to_download_to}"
             )
         self.download_items[download_item.download_id] = download_item
         download_item.download_task._start()
@@ -143,8 +140,10 @@ class DownloadManager:
             self.download_items[download_item.download_id] = download_item
             del self.terminal_download_items[download_item.download_id]
 
-        download_item.download_task.connect_delete_request_notify_callable(on_delete)
-        download_item.download_task.connect_retry_request_notify_callable(on_retry)
+        download_item.download_task.connect_delete_request_notify_callable(
+            on_delete)
+        download_item.download_task.connect_retry_request_notify_callable(
+            on_retry)
 
         return download_item.download_id
 
@@ -200,7 +199,7 @@ class DownloadManager:
             self.terminal_download_items[download_id] = resulting_state
             return
 
-        raise ValueError("The download id doesn't exist in manager")
+        raise DownloadNotFoundError()
 
     async def delete_download_task(self, download_id: str, delete_file: bool):
         if delete_file:
@@ -231,14 +230,13 @@ class DownloadManager:
         raise ValueError("The download id doesn't exist in manager")
 
     async def get_id_to_filepaths(self) -> List[tuple[str, pathlib.Path]]:
-        ids: List[str] = []
-        filepath_get_tasks: List[Coroutine[Any, Any, pathlib.Path]] = []
-        for id, download_task in self.download_items.items():
-            filepath_get_task = download_task.download_task.get_filepath()
-            filepath_get_tasks.append(filepath_get_task)
-            ids.append(id)
-        filepaths = await asyncio.gather(*filepath_get_tasks)
-        return list(zip(ids, filepaths))
+        download_infos = await self.get_all_download_infos()
+        required_id_to_filepaths = [
+            (info.download_id, pathlib.Path(info.filepath))
+            for info in download_infos
+            if info.download_id is not None
+        ]
+        return required_id_to_filepaths
 
     async def get_download_info_by_id(
         self, download_id: str
@@ -276,7 +274,8 @@ class DownloadManager:
         terminal_items_ids = list(self.terminal_download_items.keys())
         all_ids = list(download_item_ids) + list(terminal_items_ids)
         for download_id in all_ids:
-            download_state_futures.append(self.get_download_info_by_id(download_id))
+            download_state_futures.append(
+                self.get_download_info_by_id(download_id))
         return await asyncio.gather(*download_state_futures)
 
     async def get_all_id_to_download_infos(
@@ -290,7 +289,8 @@ class DownloadManager:
             self.terminal_download_items.keys()
         )
         for download_id in all_ids:
-            download_state_futures.append(self.get_download_info_by_id(download_id))
+            download_state_futures.append(
+                self.get_download_info_by_id(download_id))
         required_infos = await asyncio.gather(*download_state_futures)
         required_dict: dict[str, downloadstates.DownloadInfoState] = {}
         for info in required_infos:

@@ -1,10 +1,9 @@
-import React, { Children, useEffect, useRef, useState } from "react";
-import { ReactNode } from "react";
-import { DialogHeader, DialogTrigger, DialogTitle, DialogDescription, DialogContent, Dialog, DialogFooter } from "@/components/ui/dialog";
+import React, { useEffect, useState, useRef } from "react";
+import { DialogHeader, DialogTitle, DialogDescription, DialogContent, Dialog, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import { SerializedMisc, GetSerializedMisc, SaveSerializedMisc } from "../code/MiscObj"
+import { SerializedMisc, SaveSerializedMisc } from "../code/MiscObj"
+import { UseDefaultDataForDownloadDialog } from "../hooks/GetDefaultDataForDownloadInfo"
 interface AddDownloadDialogButtonProps {
 	submitEvent?: (url: string, folderPath: string) => void;
 	dialogOpen: boolean;
@@ -13,15 +12,19 @@ interface AddDownloadDialogButtonProps {
 export function AddDownloadDialogButton({ submitEvent, dialogOpen, dialogOpenStatusChangeRequest }: AddDownloadDialogButtonProps) {
 	const [chosenUrl, setChosenUrl] = useState<string | null>(null);
 	const [choosenFolder, setChoosenFolder] = useState<string | null>(null)
-	const [misc, setMisc] = useState<SerializedMisc>({ lastUsedUrl: "", lastUsedDownloadFolder: "" })
+	const misc = UseDefaultDataForDownloadDialog()
+	const firstRun = useRef(true)
 	useEffect(() => {
 		(async () => {
-			const gottenMisc = await GetSerializedMisc()
-			setMisc(gottenMisc)
-			setChosenUrl(gottenMisc.lastUsedUrl)
-			setChoosenFolder(gottenMisc.lastUsedDownloadFolder)
+			setChosenUrl(misc.lastUsedUrl)
+			setChoosenFolder(misc.lastUsedDownloadFolder)
 		})()
-	}, [])
+		if (firstRun.current) {
+			firstRun.current = false
+			return
+		}
+		dialogOpenStatusChangeRequest?.(true)
+	}, [misc])
 	async function selectFolder() {
 		const choosen_filepath = await window.electronApi.promptToSelectDir()
 		const choosen_filepaths_arr = choosen_filepath.filePaths

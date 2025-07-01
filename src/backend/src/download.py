@@ -12,6 +12,7 @@ import asyncio
 import functools
 import json
 import warnings
+import fastapi_exceptions
 
 warnings.warn(
     "The download module is deprecated, and only exists as a prototype/reference",
@@ -101,7 +102,7 @@ class Downloader(SingleMutexClass):
 
     async def download(self, download_url: str, filepath: pathlib.Path):
         if not extras.is_valid_download_url(download_url):
-            raise extras.InvalidDownloadUrlError()
+            raise fastapi_exceptions.InvalidDownloadUrlError()
         filepath_str: str = await utils.get_filepath(
             download_url, self.headers, str(filepath)
         )

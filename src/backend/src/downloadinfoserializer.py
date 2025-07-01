@@ -1,7 +1,7 @@
 import pathlib
 import typing
 import downloadstates
-from extras import DownloadIdMissingError
+from fastapi_exceptions import DownloadIdMissingError
 import pydantic
 
 

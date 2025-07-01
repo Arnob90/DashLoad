@@ -1,21 +1,18 @@
-import string
-import uuid
+import asyncio
 import download_manager_factory
 import fastapi
 from internet_connections import NetworkConnectionPoller
 from pydantic import BaseModel
-import downloaditem
 import download_manager
 import extras
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Annotated
 import uvicorn
-import downloader
 import pathlib
 import argparse
 import logging
-from downloadstates import DownloadStateVariants, QueuedDownloadInfo
-import debugpy
+from downloadstates import DownloadStateVariants
+import fastapi_exceptions
 
 main_logger = logging.getLogger(__name__)
 app = fastapi.FastAPI()
@@ -32,6 +29,11 @@ app.add_middleware(
 # The rationale is that, if a malicious process is able to execute the server directly, it can probably download
 # through curl anyways, and so we have already lost
 # This is mainly for testing purposes
+
+
+@app.exception_handler(fastapi_exceptions.ApiError)
+async def handle_api_error(request: fastapi.Request, exc: fastapi_exceptions.ApiError):
+    return await fastapi_exceptions.api_error_handler(request, exc)
 
 
 class SecretHolderSingleton:
@@ -99,16 +101,9 @@ async def post_request(
 ) -> DownloadStartResponse:
     assert SecretHolderSingleton.verify_secret(x_session_token)
     id: str = ""
-    try:
-        id = await dl_manager.add_pypdl_download(
-            request.url, pathlib.Path(request.filepath)
-        )
-    except extras.InvalidDownloadUrlError:
-        raise fastapi.HTTPException(status_code=404, detail="The given url is invalid")
-    except extras.DownloadToAnExistingPathError as err:
-        raise fastapi.HTTPException(status_code=409, detail=str(err))
-    except Exception as err:
-        main_logger.info(err)
+    id = await dl_manager.add_pypdl_download(
+        request.url, pathlib.Path(request.filepath)
+    )
     return DownloadStartResponse(id=id)
 
 
@@ -118,9 +113,7 @@ async def get_by_id(id: str, x_session_token: Annotated[str, fastapi.Header()]):
     try:
         required_task = await dl_manager.get_download_info_by_id(id)
     except KeyError:
-        raise fastapi.HTTPException(
-            status_code=404, detail="The required download does not exist"
-        )
+        raise fastapi_exceptions.DownloadNotFoundError()
     return required_task
 
 
@@ -204,7 +197,32 @@ async def shutdown(x_session_token: Annotated[str, fastapi.Header()]):
         await dl_manager.shutdown()
         server.should_exit = True
     else:
-        raise fastapi.HTTPException(status_code=500, detail="The server is not running")
+        raise fastapi.HTTPException(
+            status_code=500, detail="The server is not running")
+
+
+class ExtensionDownloadRequest(BaseModel):
+    url: str
+
+
+extension_download_request_queued: asyncio.Queue[ExtensionDownloadRequest] = (
+    asyncio.Queue()
+)
+
+
+@app.post("/extension/download")
+async def handle_extension_download_request(request: ExtensionDownloadRequest):
+    await extension_download_request_queued.put(request)
+    return
+
+
+@app.websocket("/frontend/download/queue")
+async def send_extension_download_request_to_client(websocket: fastapi.WebSocket):
+    await websocket.accept()
+    while True:
+        request = await extension_download_request_queued.get()
+        main_logger.info("Sending request to client")
+        await websocket.send_json(request.model_dump())
 
 
 logging.info("Logging is working")

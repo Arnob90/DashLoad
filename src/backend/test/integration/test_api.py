@@ -62,4 +62,5 @@ def test_invalid_url():
     response: httpx.Response = client.post(
         "/download/", json=download_req.model_dump(), headers=headers
     )
+    main_logger.info(response.json())
     assert response.status_code == 404
